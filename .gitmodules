@@ -1,0 +1,6 @@
+[submodule "reference/rainbond-console"]
+	path = reference/rainbond-console
+	url = git@github.com:goodrain/rainbond-console.git
+[submodule "reference/rainbond-ui"]
+	path = reference/rainbond-ui
+	url = git@github.com:goodrain/rainbond-ui.git
