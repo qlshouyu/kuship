@@ -1,0 +1,11 @@
+mirrors:
+  "goodrain.me":
+    endpoint:
+      - "https://goodrain.me"
+configs:
+  "goodrain.me":
+    auth:
+      username: admin
+      password: admin1234
+    tls:
+      insecure_skip_verify: true
