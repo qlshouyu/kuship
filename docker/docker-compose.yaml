@@ -1,0 +1,85 @@
+# kuship 本地开发栈 docker-compose 编排
+#
+# 说明：
+#   - rainbond 服务使用的镜像 `rainbond-dev:v6.7.1-release` 由仓库根目录下的
+#     `standalone_build.sh` 通过 `standalone/Dockerfile` 构建产出。
+#   - 首次启动前，请先在仓库根目录执行 `./standalone_build.sh`，确保
+#     `k3s-images-<arch>.tar.zst` 离线镜像包已就位（compose 自带的 `build`
+#     段不会调用 `standalone/images-package.sh` 准备该离线包）。
+#   - 启动方式：`docker compose -f docker/docker-compose.yaml up -d`
+
+services:
+  redis:
+    image: redis:8.0-alpine
+    container_name: kuship-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      default:
+        ipv4_address: 172.20.0.11
+
+  mysql:
+    image: mysql:8.0
+    container_name: kuship-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql-init.sql:/docker-entrypoint-initdb.d/00-native-password.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p123456 --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      default:
+        ipv4_address: 172.20.0.10
+
+  rainbond:
+    image: rainbond-dev:v6.7.1-release
+    build:
+      context: ..
+      dockerfile: standalone/Dockerfile
+      args:
+        VERSION: v6.7.1-release
+    container_name: kuship-rainbond
+    restart: unless-stopped
+    privileged: true
+    environment:
+      VERSION: v6.7.1-release
+      DB_HOST: 172.20.0.10
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: "123456"
+      UI_DB_HOST: 172.20.0.10
+      UI_DB_PORT: "3306"
+      UI_DB_USER: root
+      UI_DB_PASSWORD: "123456"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "7070:7070"
+      - "80:80"
+      - "443:443"
+      - "6443:6443"
+    volumes:
+      - rainbond-data:/opt/rainbond
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  mysql-data:
+  rainbond-data:
