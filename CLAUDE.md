@@ -29,7 +29,10 @@ kuship/
 │   ├── rainbond-ui/             # Rainbond 控制台前端
 │   └── rainbond-chart/          # Rainbond Helm Chart（含 CRD 与模板）
 │
+├── kuship-console/              # java springboot技术栈实现的rainbond-console，参考rainbond-console代码
+├── kuship-ui/                   # 新的控制台前端，直接拷贝rainbond-ui，调用kuship-console
 └── .claude/                     # Claude Code 项目配置
     ├── commands/                # 自定义斜杠命令
     └── skills/                  # 项目级技能
+
 ```

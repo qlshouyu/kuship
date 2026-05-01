@@ -40,6 +40,6 @@
 
 ## 7. 提交分层
 
-- [ ] 7.1 第一次提交：仅包含 `kuship-ui/` 的纯拷贝（步骤 1 的产物），diff 几乎全为新增；提交信息：`feat(kuship-ui): copy rainbond-ui snapshot as kuship-ui base`
-- [ ] 7.2 第二次提交：包含步骤 2 / 3 / 4 的所有改动；提交信息：`feat(kuship-ui): rebrand identity and document backend target switch`
-- [ ] 7.3 不在任何提交中改动 `reference/rainbond-ui` submodule
+- [x] 7.1 第一次提交：仅包含 `kuship-ui/` 的纯拷贝（步骤 1 的产物），diff 几乎全为新增；提交信息：`feat(kuship-ui): copy rainbond-ui snapshot as kuship-ui base`
+- [x] 7.2 第二次提交：包含步骤 2 / 3 / 4 的所有改动；提交信息：`feat(kuship-ui): rebrand identity and document backend target switch`
+- [x] 7.3 不在任何提交中改动 `reference/rainbond-ui` submodule

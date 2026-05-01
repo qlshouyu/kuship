@@ -1,5 +1,13 @@
 # kuship
 kubernetes管理系统
+
+## 项目结构
+- `kuship-console/` —— kuship 后端控制台（Java Spring Boot 重写 rainbond-console）。
+- `kuship-ui/` —— kuship 控制台前端（基于 rainbond-ui 拷贝起步，独立演进）。开发态默认对接 `add-docker-compose-stack` 启动的 rainbond-console 测试实例（`http://localhost:7070`）；切换到 kuship-console 通过 `CONSOLE_PROXY_TARGET` 环境变量覆盖。
+- `reference/` —— Rainbond 上游代码（git submodule，只读，作为对照参考）。
+- `standalone/`、`docker/` —— standalone 镜像与 docker-compose 开发栈相关资产。
+- `openspec/` —— OpenSpec 规范与变更提案。详见各子目录下的 `proposal.md` / `tasks.md`。
+
 ## standalone 镜像制作
 ```bash
 ./standalone_build.sh                  # 默认：仓库根已有 k3s-images-<arch>.tar.zst 时复用，否则重打

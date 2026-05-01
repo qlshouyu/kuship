@@ -1,13 +1,13 @@
 {
-  "name": "rainbond-ui",
+  "name": "kuship-ui",
   "version": "5.3.0",
-  "description": "rainbond front-end project.",
+  "description": "kuship console frontend (forked from rainbond-ui as the starting baseline).",
   "private": true,
   "scripts": {
     "start": "umi dev",
     "start:no-mock": "cross-env MOCK=none umi dev",
     "build": "umi build",
-    "image": "umi build && docker build -t registry.cn-hangzhou.aliyuncs.com/goodrain/rainbond-ui:V5.2.1-pre-release .",
+    "image": "umi build && docker build -t kuship/kuship-ui:dev .",
     "site": "roadhog-api-doc static && gh-pages -d dist",
     "analyze": "cross-env ANALYZE=true roadhog build"
   },

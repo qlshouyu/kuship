@@ -1,14 +1,21 @@
-<img src="https://github.com/goodrain/rainbond/blob/master/docs/rainbond_logo.png" width="100%">
-
 [English](README.md) | 简体中文
 
-# Rainbond-ui
+# kuship-ui
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/goodrain/rainbond)](https://goreportcard.com/report/github.com/goodrain/rainbond)
-[![GitHub stars](https://img.shields.io/github/stars/goodrain/rainbond.svg?style=flat-square)](https://github.com/goodrain/rainbond/stargazers)
-![Rainbond version](https://img.shields.io/badge/version-v5.0-brightgreen.svg)
-[![Build Status](https://travis-ci.org/goodrain/rainbond.svg?branch=master)](https://travis-ci.org/goodrain/rainbond)
-[![GoDoc](https://godoc.org/github.com/goodrain/rainbond?status.svg)](https://godoc.org/github.com/goodrain/rainbond)
+> 本工程基于 [rainbond-ui](https://github.com/goodrain/rainbond-ui) 提交 `9dcc296d3ec5d6cfdfc1c351bb0e50d1af0ac126` 拷贝而来，自此独立演进。原始实现保留为只读的 `reference/rainbond-ui/` git submodule，可作对照。
+
+kuship-ui 是 kuship 项目的控制台前端工程（UMI 3.5 + DVA 2.4 + React 16.8 + Antd 3.19），与 `kuship-console`（Java Spring Boot 重写的后端）配套使用，过渡期默认对接由本仓库 `add-docker-compose-stack` 启动的 rainbond-console 测试实例。
+
+## 后端目标切换 / Backend target
+
+开发态（`yarn start`）下，`/console`、`/data`、`/openapi/v1`、`/enterprise-server`、`/app-server` 五条路径会通过 `config/config.js` 中的 `CONSOLE_PROXY_TARGET` 环境变量代理到同一个后端。
+
+- **默认值**：`CONSOLE_PROXY_TARGET=http://localhost:7070`，对应本仓库 `add-docker-compose-stack` 启动的 rainbond-console 测试实例。
+- **切换到 kuship-console**：`CONSOLE_PROXY_TARGET=http://localhost:<kuship-console-port> yarn start`。具体端口由 kuship-console 在后续变更中确定。
+
+下方保留 rainbond-ui 原文档作为参考（与 kuship 业务无关的章节将在后续变更中精简）。
+
+---
 
 [项目官网](http://www.rainbond.com) • [文档](https://www.rainbond.com/docs/stable/) • [在线体验](https://github.com/goodrain/rainbond/blob/master/README_EN.md)
 
