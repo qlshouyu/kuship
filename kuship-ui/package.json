@@ -4,10 +4,10 @@
   "description": "kuship console frontend (forked from rainbond-ui as the starting baseline).",
   "private": true,
   "scripts": {
-    "start": "umi dev",
-    "start:no-mock": "cross-env MOCK=none umi dev",
-    "build": "umi build",
-    "image": "umi build && docker build -t kuship/kuship-ui:dev .",
+    "start": "cross-env NODE_OPTIONS=--openssl-legacy-provider umi dev",
+    "start:no-mock": "cross-env MOCK=none NODE_OPTIONS=--openssl-legacy-provider umi dev",
+    "build": "cross-env NODE_OPTIONS=--openssl-legacy-provider umi build",
+    "image": "cross-env NODE_OPTIONS=--openssl-legacy-provider umi build && docker build -t kuship/kuship-ui:dev .",
     "site": "roadhog-api-doc static && gh-pages -d dist",
     "analyze": "cross-env ANALYZE=true roadhog build"
   },
