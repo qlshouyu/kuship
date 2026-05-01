@@ -1,0 +1,155 @@
+@import '~antd/lib/style/themes/default.less';
+
+.registerWrapper {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.prefixIcon {
+  font-size: 16px;
+  color: @text-color-secondary;
+}
+
+.registerHeader {
+  margin-bottom: 24px;
+
+  h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: @text-color;
+    margin: 0 0 8px 0;
+  }
+
+  p {
+    font-size: 16px;
+    color: @text-color-secondary;
+    margin: 0;
+  }
+}
+
+.formItem {
+  margin-bottom: 12px;
+
+  label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: @text-color;
+    margin-bottom: 8px;
+  }
+
+  :global {
+    .ant-form-item {
+      margin-bottom: 16px;
+    }
+  }
+}
+
+.loginLink {
+  text-align: center;
+  margin-top: 16px;
+
+  span {
+    color: @text-color-secondary;
+    font-size: 14px;
+  }
+
+  a {
+    color: @primary-color;
+    font-size: 14px;
+    margin-left: 4px;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.main {
+  width: 100%;
+
+  &>h3 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #374551;
+    font-weight: 600;
+    margin-bottom: 20px;
+    font-size: 24px;
+  }
+
+  .logo {
+    width: 100%;
+
+    h2 {
+      width: 100%;
+      font-size: 24px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    p {
+      width: 100%;
+      text-align: end;
+      padding-right: 20px;
+      margin-bottom: 20px;
+    }
+  }
+
+  :global {
+    .ant-form-item {
+      margin-bottom: 14px;
+    }
+  }
+
+  .getCaptcha {
+    display: block;
+    width: 100%;
+  }
+
+  .submit {
+    width: 50%;
+  }
+
+  .login {
+    float: right;
+    line-height: @btn-height-lg;
+  }
+
+}
+.boxJump {
+  background: #fff;
+  font-size: 12px;
+  text-align: center;
+  padding: 8px 0;
+
+  a {
+    color: #000;
+  }
+}
+
+.success,
+.warning,
+.error {
+  transition: color 0.3s;
+}
+
+.success {
+  color: @rbd-success-status;
+}
+
+.warning {
+  color: @rbd-warning-status;
+}
+
+.error {
+  color: @rbd-error-status;
+}
+
+.progress-pass > .progress {
+  :global {
+    .ant-progress-bg {
+      background-color: @rbd-warning-status;
+    }
+  }
+}

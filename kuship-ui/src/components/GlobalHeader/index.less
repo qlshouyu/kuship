@@ -1,0 +1,652 @@
+@import "~antd/lib/style/themes/default.less";
+
+.header {
+  padding: 0 12px 0 0;
+  background: @rbd-background-color;
+  // background: #fff;
+
+  position: relative;
+}
+
+.enterprise {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+  padding-left: 1.5em;
+  padding-right: .5em;
+  height: 56px;
+  line-height: 56px;
+  margin-right: 20px;
+  float: left;
+  cursor: pointer;
+
+  img {
+    width: 140px;
+    height: 22px;
+  }
+
+  svg {
+    margin-right: 10px;
+  }
+
+  a {
+    color: #333;
+    font-size: 18px;
+    text-decoration: none;
+  }
+}
+
+.logoWrapper {
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  padding-right: 0px;
+  height: 56px;
+  margin-right: 40px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  overflow: hidden;
+
+  img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    flex-shrink: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  &:hover {
+    opacity: 0.85;
+  }
+}
+
+.logoCollapsed {
+  padding-left: 12px;
+  padding-right: 10px;
+  margin-right: 0px;
+}
+
+// 企业视图下常驻显示时的样式
+.logoEnterprise {
+  padding-left: 10px;
+}
+
+.enterpriseName {
+  padding-top: 8px;
+  line-height: 56px;
+  margin-left: 4px;
+  font-size: 22px;
+  font-family: "Now", "Montserrat", sans-serif;
+  font-weight: bold;
+  color: #3399ff;
+  max-width: 160px;
+  opacity: 1;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.select {
+  float: left;
+  display: flex;
+}
+
+.itemBox {
+  float: left;
+  color: #333;
+  line-height: 56px;
+}
+
+.item {
+  float: left;
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  color: #333;
+
+  svg {
+    margin-right: 10px;
+  }
+}
+
+.item:hover {
+  color: @primary-5;
+
+  svg {
+    fill: @primary-5 !important;
+  }
+}
+
+.itemlink {
+  color: rgba(51, 51, 51, 0.85);
+}
+
+.breadCrumb {
+  width: 100%;
+  height: 56px;
+  display: flex;
+  align-items: center;
+}
+
+.itemseparator {
+  margin: 0 8px;
+  color: rgba(51, 51, 51, 0.85);
+}
+
+.select:first {
+  margin-right: 16px;
+}
+
+.uesrInfo {
+  padding: 12px;
+  background: #fff;
+  border-radius: 4px;
+  outline: none;
+  -webkit-box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  -webkit-transition: background .3s, width .2s;
+  transition: background .3s, width .2s;
+  zoom: 1;
+
+  :global {
+
+    .ant-menu-inline,
+    .ant-menu-vertical,
+    .ant-menu-vertical-left {
+      border: none !important;
+    }
+  }
+
+  :global {
+    .ant-menu-item>.anticon {
+      svg>path {
+        fill: rgba(51, 51, 51, 1) !important;
+      }
+    }
+
+    .ant-menu-item:hover {
+      .anticon {
+        svg>path {
+          fill: @primary-color !important;
+        }
+      }
+    }
+  }
+
+  li {
+    font-size: @rbd-content-size !important;
+    color: @rbd-content-color;
+    line-height: @rbd-content-line-height !important;
+    font-family: PingFangSC-Regular, PingFang SC;
+    color: rgba(51, 51, 51, 1);
+    height: @rbd-content-line-height !important;
+
+    i {
+      font-size: @rbd-content-size !important;
+    }
+  }
+}
+
+.noticeIcon {
+  i {
+    color: #333
+  }
+}
+
+:global {
+  .ant-layout {
+    /* overflow-x: hidden; */
+    overflow: hidden;
+  }
+}
+
+.logo {
+  height: 56px;
+  line-height: 64px;
+  vertical-align: top;
+  display: inline-block;
+  padding: 0 0 0 24px;
+  cursor: pointer;
+  font-size: 20px;
+
+  img {
+    display: inline-block;
+    vertical-align: middle;
+  }
+}
+
+.menu {
+  :global(.anticon) {
+    margin-right: 8px;
+  }
+
+  :global(.ant-dropdown-menu-item) {
+    width: 160px;
+  }
+}
+
+.platform {
+  backdrop-filter: blur(10px);
+  border-radius: 6px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+
+i.trigger {
+  font-size: 20px;
+  line-height: 56px;
+  cursor: pointer;
+  transition: all .3s, padding 0s;
+  vertical-align: middle;
+  padding: 0 24px;
+
+  &:hover {
+    // background: @primary-1;
+  }
+}
+
+.teamregion {
+  display: inline-block;
+  vertical-align: middle;
+  overflow: hidden;
+  padding: 0 35px 0 35px;
+
+  .tit {
+    margin-right: 10px;
+    color: #333;
+  }
+
+  .dropdown {
+    color: #333;
+    cursor: pointer;
+  }
+}
+
+.smShow {
+  display: none;
+}
+
+@media screen and (max-width: 480px) {
+  .teamregion {
+    .tit {
+      display: none;
+    }
+  }
+
+  .smShow {
+    display: inline-block;
+  }
+
+  .smHidden {
+    display: none;
+  }
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.productIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: #333;
+  cursor: pointer;
+  margin-left: 8px;
+  margin-right: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 6px;
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: @primary-color;
+  }
+
+  &:active {
+    transform: scale(0.95);
+    background: rgba(0, 0, 0, 0.1);
+  }
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+
+  .action {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 6px 12px;
+    transition: all .3s;
+    backdrop-filter: blur(10px);
+    border-radius: 6px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.05);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    >i {
+      font-size: 16px;
+      padding: 4px;
+      color: #333;
+    }
+
+    .name {
+      color: #333;
+    }
+
+  }
+
+  .search {
+    padding: 0;
+    margin: 0 12px;
+
+    &:hover {
+      background: transparent;
+    }
+  }
+
+  .account {
+    .avatar {
+      margin: 0px 8px;
+      color: #fff;
+      background: @primary-color;
+      vertical-align: middle;
+    }
+  }
+}
+
+.nameBox {
+  width: 100%;
+  text-align: center;
+  height: 30px;
+  line-height: 30px;
+}
+
+:global {
+  .ant-layout-header {
+    height: 56px;
+    line-height: 0px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid @border-color-base;
+    background-color: @rbd-background-color !important;
+    padding: 0 !important;
+    height: 56px !important;
+    line-height: 56px !important;
+  }
+}
+
+.balance {
+  background-color: rgba(0, 0, 0, 0.05);
+  margin-right: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0px 14px;
+  border-radius: 5px;
+  color: #333;
+
+  .balanceTitle {
+    line-height: 20px;
+  }
+
+  .balanceNum {
+    line-height: 20px;
+    font-weight: 700;
+  }
+}
+
+.balance:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.iconContainer {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding-left: 12px;
+  margin-left: 12px;
+}
+
+.wechat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  >p {
+    font-size: 12px;
+    margin-top: 6px;
+  }
+}
+
+// ==================== 视图切换器 ====================
+.viewSwitcher {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+}
+
+.switcherInner {
+  position: relative;
+  display: flex;
+  background: #f0f2f5;
+  border-radius: 8px;
+  padding: 3px;
+  height: 36px;
+}
+
+.switcherItem {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  cursor: pointer;
+  border-radius: 6px;
+  color: #676f83;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.active {
+    color: @primary-color;
+  }
+}
+
+.switcherIcon {
+  font-size: 16px;
+  margin-right: 6px;
+}
+
+.switcherText {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.switcherSlider {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  height: calc(100% - 6px);
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// ==================== 用户下拉菜单 ====================
+.userDropdown {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  min-width: 240px;
+  overflow: hidden;
+}
+
+.userHeader {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.userAvatar {
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #ff9a44 0%, #fc6076 100%);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.userInfo {
+  margin-left: 12px;
+  overflow: hidden;
+}
+
+.userName {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userEmail {
+  font-size: 13px;
+  color: #999;
+  line-height: 1.4;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menuList {
+  padding: 8px 0;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #f5f5f5;
+  }
+}
+
+.menuIcon {
+  font-size: 18px;
+  color: #666;
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.menuText {
+  font-size: 14px;
+  color: #333;
+  flex: 1;
+}
+
+.menuItemLanguage {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #f5f5f5;
+  }
+
+  .menuIcon {
+    svg {
+      width: 20px;
+      height: 20px;
+    }
+  }
+}
+
+.languageValue {
+  font-size: 14px;
+  color: #999;
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.menuArrow {
+  font-size: 12px;
+  color: #ccc;
+}
+
+.menuItemLogout {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #fff5f5;
+  }
+
+  .menuIcon {
+    color: #ff4d4f;
+
+    svg path {
+      fill: #ff4d4f;
+    }
+  }
+
+  .menuText {
+    color: #ff4d4f;
+  }
+}
+
+.menuFooter {
+  border-top: 1px solid #f0f0f0;
+  padding: 8px 0;
+}

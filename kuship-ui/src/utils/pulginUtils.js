@@ -1,0 +1,137 @@
+
+// 定义插件所在视图，支持平台、团队、应用和组件四个范围。对应取值为Platform、Team、Application、Component
+export default {
+  // 对企业级、团队级、应用级的插件列表进行筛选归类
+  segregatePluginsByHierarchy(list, type) {
+      // 根据不同视图定义需要屏蔽的插件
+      const excludePluginsByView = {
+        'Team': ['rainbond-enterprise-base', 'rainbond-bill', 'rainbond-observability', 'rainbond-enterprise-alarm', 'rainbond-enterprise-logs'],
+        'Application': ['rainbond-enterprise-base', 'rainbond-bill', 'rainbond-observability', 'rainbond-enterprise-alarm', 'rainbond-enterprise-logs'],
+        'Platform': ['rainbond-enterprise-base', 'rainbond-bill', 'rainbond-observability', 'rainbond-enterprise-alarm', 'rainbond-enterprise-logs','rainbond-gpu'],
+        'Component': ['rainbond-enterprise-base', 'rainbond-bill', 'rainbond-observability', 'rainbond-enterprise-alarm', 'rainbond-enterprise-logs'],
+        'TeamModal': ['rainbond-enterprise-base', 'rainbond-bill', 'rainbond-observability', 'rainbond-enterprise-alarm', 'rainbond-enterprise-logs']
+      };
+
+      // 获取当前视图需要排除的插件列表,如果没有配置则使用默认值
+      const excludePlugins = excludePluginsByView[type] || ['rainbond-enterprise-base', 'rainbond-bill', 'rainbond-observability', 'rainbond-enterprise-alarm', 'rainbond-enterprise-logs'];
+
+      const arr = (list || []).filter(item =>
+        item?.plugin_views?.includes(type)
+        && !excludePlugins.includes(item.name)
+        && item.enable_status === 'true'
+      ).map(item => item);
+      return arr
+  },
+  // 判断当前企业是否安装企业插件
+  isInstallEnterprisePlugin(list) {
+    return (list || []).some(element => element.name === 'rainbond-enterprise-base');
+  },
+
+  getPluginInfo(list, pluginId) {
+    const pluginList = {}
+    Object.keys(list || {}).forEach(item => {
+      const plugin = list[item]
+      plugin.forEach(items => {
+        if (items.name === pluginId) {
+          pluginList[item]=items
+        }
+      })
+    });
+    return pluginList
+  },
+  // 判断是否安装了某个插件
+  isInstallPlugin(list, pluginId) {
+    return (list || []).some(element => element.name === pluginId);
+  },
+  // 判断当前路由的视图位置
+  getCurrentViewPosition(urlPath) {
+    const url = new URL(urlPath);
+    const path = url.hash.substring(1);
+    const enterpriseRegex = /^\/enterprise\/[\w-]+/;
+    const teamRegionRegex = /^\/team\/[\w-]+\/region\/[\w-]+/;
+    const teamAppRegex = /^\/team\/[\w-]+\/region\/[\w-]+\/apps/;
+    if (enterpriseRegex.test(path)) {
+      return 'Platform';
+    } else if (teamRegionRegex.test(path) && !teamAppRegex.test(path)) {
+      return 'Team';
+    } else if (teamAppRegex.test(path) && teamRegionRegex.test(path)) {
+      return 'Application';
+    } else {
+      return 'Component';
+    }
+  },
+  // 判断输出位置
+  isCurrentPluginMultiView(urlPath, viewArr) {
+    const ViewPosition = this.getCurrentViewPosition(urlPath);
+
+    // 当viewArr长度为1时，直接输出'root'
+    if (viewArr.length === 1) {
+      return 'root';
+    }
+
+    // 当viewArr长度为2时，执行进一步的判断逻辑
+    else if (viewArr.length === 2) {
+      const [firstView, secondView] = viewArr;
+      // 如果viewArr包含Platform，则Platform输出root，其他输出OtherPages
+      if (viewArr.includes('Platform')) {
+        return ViewPosition === 'Platform' ? 'root' : 'OtherPages';
+      }
+      // 如果viewArr没有Platform，判断Team、Application和Component的优先级
+      const priority = ['Team', 'Application', 'Component'];
+      // 获取firstView和secondView的优先级索引
+      const firstPriority = priority.indexOf(firstView);
+      const secondPriority = priority.indexOf(secondView);
+      // 根据优先级进行判断，优先级较高的视图输出'root'，另一个视图输出'OtherPages'
+      if (firstPriority < secondPriority) {
+        return ViewPosition === firstView ? 'root' : 'OtherPages';
+      } else {
+        return ViewPosition === secondView ? 'root' : 'OtherPages';
+      }
+    }
+
+    // 默认输出'OtherPages'，处理其他情况
+    return 'OtherPages';
+  },
+
+  // 判断渲染的key
+  determineRenderKey(key) {
+    switch (key) {
+      case 'Operation':
+        return 'OperationLogPage'
+        break;
+      case 'login':
+        return 'EntryLogPage'
+        break;
+      case 'Permission':
+        return 'PermissionPage'
+        break;
+      case 'Customization':
+        return 'CustomizationPage'
+        break;
+      case 'AppBackUp':
+        return 'AppBackUpPage'
+        break;
+      case 'PackageUpload':
+        return 'PackageUploadPage'
+        break;
+      case 'OverMark':
+        return 'OverMarkPage'
+        break;
+      default:
+        return key
+        break;
+    }
+  },
+  // 获取ifram地址栏传参数
+getIframeParams (key)  {
+  switch (key) {
+    case 'rainbond-enterprise-logs':
+      return '/explore?orgId=1&kiosk=tv&left=%7B%22datasource%22:%22P8E80F9AEF21F6940%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22P8E80F9AEF21F6940%22%7D%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D'
+      break;
+    default:
+      return key
+      break;
+  }
+}
+}
+

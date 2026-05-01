@@ -1,0 +1,101 @@
+.linkStyle{
+    font-weight: 600;
+}
+.nameStyle{
+    margin-left: 5px;
+    svg{
+        vertical-align: sub;
+    }
+}
+.rowStyle{
+    cursor: pointer !important;
+}
+.tdStyle{
+    margin-bottom: 4px;
+    font-weight: 600;
+    font-size: 13px;
+}
+.tdStyle+p{
+    margin-bottom: 0px;
+    font-size: 12px;
+}
+.describe {
+    background: rgba(22, 184, 248, 0.1);
+    padding: 8px;
+    z-index: 1 !important;
+    li {
+      line-height: 24px;
+    }
+  }
+  
+  .editable-cell {
+    position: relative;
+  }
+  
+  .editable-cell-value-wrap {
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  
+  .editable-row:hover .editable-cell-value-wrap {
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    padding: 4px 11px;
+  }
+  
+  .cmd {
+    position: relative;
+    padding: 16px;
+    background: #000;
+    color: #fff;
+    line-height: 16px;
+    display: block;
+    font-size: 10px;
+    font-family: PingFangSC-Regular, sans-serif;
+  }
+  .copy {
+    position: absolute;
+    right: 4px;
+    top: 5px;
+    font-size: 16px;
+  }
+
+.cardContainer {
+    background: #fff;
+    margin: 2px;
+    border-radius: 12px;
+    box-shadow: @rbd-min-card-shadow;
+    border: 1px solid rgba(16, 24, 40, 0.08);
+    margin-bottom: 16px;
+}
+
+.cardHeader {
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cardBody {
+    padding: 0 24px 24px;
+}
+
+.titleStyle {
+    display: flex;
+    align-items: center;
+
+    span:nth-of-type(1) {
+        margin-right: 6px;
+
+        svg {
+            vertical-align: bottom;
+        }
+    }
+
+    span:nth-of-type(2) {
+        font-weight: bolder;
+        font-size: @rbd-sub-title-size;
+        color: @rbd-sub-title-color;
+        line-height: @rbd-sub-title-line-height;
+    }
+}

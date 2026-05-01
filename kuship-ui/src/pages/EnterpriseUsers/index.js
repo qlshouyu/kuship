@@ -1,0 +1,425 @@
+import { Button, Input, notification, Table } from 'antd';
+import { connect } from 'dva';
+import { routerRedux } from 'dva/router';
+import moment from 'moment';
+import React, { PureComponent } from 'react';
+import ConfirmModal from '../../components/ConfirmModal';
+import CreatUser from '../../components/CreatUserForm';
+import CurrentTeams from '../../components/CurrentTeams';
+import PageHeaderLayout from '../../layouts/PageHeaderLayout';
+import cloud from '../../utils/cloud';
+import userUtil from '../../utils/user';
+import pageheaderSvg from '@/utils/pageHeaderSvg';
+import { FormattedMessage } from 'umi';
+import { formatMessage } from '@/utils/intl';
+
+const { Search } = Input;
+
+@connect(({ user, global }) => ({
+  user: user.currentUser
+}))
+export default class EnterpriseUsers extends PureComponent {
+  constructor(props) {
+    super(props);
+    const { user } = this.props;
+    const adminer = userUtil.isCompanyAdmin(user);
+    this.state = {
+      page: 1,
+      pageSize: 10,
+      adminer,
+      adminList: [],
+      total: 0,
+      currentUserInfo: false,
+      userVisible: false,
+      userInfo: false,
+      text: '',
+      delVisible: false,
+      name: '',
+      Loading: false
+    };
+  }
+  componentWillMount() {
+    const { adminer } = this.state;
+    const { dispatch } = this.props;
+    if (!adminer) {
+      dispatch(routerRedux.push(`/`));
+    }
+  }
+  componentDidMount() {
+    this.loadUser();
+  }
+  onPageChange = (page, pageSize) => {
+    this.setState(
+      {
+        page,
+        pageSize
+      },
+      () => {
+        this.loadUser();
+      }
+    );
+  };
+  handleUser = values => {
+    this.setState({
+      Loading: true
+    });
+    const {
+      dispatch,
+      match: {
+        params: { eid }
+      }
+    } = this.props;
+    const { userInfo } = this.state;
+    let info = values;
+    let setType = 'global/creatUser';
+    let setMessage = formatMessage({ id: 'notification.success.add_success' });
+    if (userInfo) {
+      info = Object.assign({}, userInfo, info);
+      setType = 'global/upEnterpriseUsers';
+      setMessage = formatMessage({ id: 'notification.success.edit' });
+    }
+    dispatch({
+      type: setType,
+      payload: {
+        enterprise_id: eid,
+        ...info
+      },
+      callback: res => {
+        if (res && res._condition === 200) {
+          this.canceUser();
+          this.loadUser();
+          notification.success({ message: setMessage });
+        }
+        this.handleCloseLoading();
+      },
+      handleError: err => {
+        if (
+          err &&
+          err.data &&
+          err.data.code &&
+          err.data.code < 600 &&
+          err.data.msg_show
+        ) {
+          notification.warning({ message: err.data.msg_show });
+        } else {
+          cloud.handleCloudAPIError(err);
+        }
+        this.handleCloseLoading();
+      }
+    });
+  };
+
+  handleCloseLoading = () => {
+    this.setState({ Loading: false });
+  };
+  handleDelete = () => {
+    const { userInfo } = this.state;
+    const {
+      dispatch,
+      match: {
+        params: { eid }
+      }
+    } = this.props;
+    dispatch({
+      type: 'global/deleteEnterpriseUsers',
+      payload: {
+        user_id: userInfo.user_id,
+        enterprise_id: eid
+      },
+      callback: res => {
+        if (res && res._condition === 200) {
+          this.loadUser();
+          this.cancelDelUser();
+          notification.success({ message: formatMessage({ id: 'notification.success.delete' }) });
+        }
+      }
+    });
+  };
+
+  loadUser = () => {
+    const {
+      dispatch,
+      match: {
+        params: { eid }
+      }
+    } = this.props;
+    const { page, pageSize, name } = this.state;
+    dispatch({
+      type: 'global/fetchEnterpriseUsers',
+      payload: {
+        enterprise_id: eid,
+        page,
+        page_size: pageSize,
+        name
+      },
+      callback: res => {
+        if (res) {
+          this.setState({ adminList: res.list, total: res.total });
+        }
+      }
+    });
+  };
+
+  // 管理员添加用户
+  addUser = () => {
+    this.setState({
+      userVisible: true,
+      text: formatMessage({ id: 'enterpriseUser.button.adduser' })
+    });
+  };
+
+  canceUser = () => {
+    this.setState({
+      userVisible: false,
+      text: '',
+      userInfo: false,
+      Loading: false
+    });
+  };
+
+  handleEdit = item => {
+    this.setState({
+      userInfo: item,
+      userVisible: true,
+      text: formatMessage({ id: 'enterpriseUser.button.edituser' })
+    });
+  };
+
+  delUser = userInfo => {
+    this.setState({
+      delVisible: true,
+      userInfo
+    });
+  };
+  cancelDelUser = () => {
+    this.setState({
+      delVisible: false,
+      userInfo: false
+    });
+  };
+  handleSearch = () => {
+    this.setState(
+      {
+        page: 1
+      },
+      () => {
+        this.loadUser();
+      }
+    );
+  };
+  handelChange = value => {
+    this.setState({ name: value && value.trim() });
+  };
+  handleCurrentUserId = currentUserInfo => {
+    this.setState({
+      currentUserInfo
+    });
+  };
+
+  render() {
+    const {
+      adminList,
+      adminer,
+      text,
+      userInfo,
+      delVisible,
+      userVisible,
+      page,
+      pageSize,
+      total,
+      Loading,
+      currentUserInfo
+    } = this.state;
+    const {
+      match: {
+        params: { eid }
+      },
+      user
+    } = this.props;
+
+    const columns = [
+      {
+        // title: '用户名称',
+        title: formatMessage({ id: 'enterpriseUser.table.userName' }),
+        dataIndex: 'nick_name',
+        rowKey: 'nick_name',
+        align: 'center',
+        render: (val, data) => (
+          <Button
+            type="link"
+            onClick={() => {
+              this.handleCurrentUserId(data);
+            }}
+          >
+            {val}
+          </Button>
+        )
+      },
+      {
+        // title: '姓名',
+        title: formatMessage({ id: 'enterpriseUser.table.name' }),
+        dataIndex: 'real_name',
+        rowKey: 'real_name',
+        align: 'center',
+        render: (val, data) => (
+          <span>
+            {val || '-'}
+          </span>
+        )
+      },
+      {
+        // title: '电话',
+        title: formatMessage({ id: 'enterpriseUser.table.phone' }),
+        dataIndex: 'phone',
+        rowKey: 'phone',
+        align: 'center',
+        render: (val, data) => (
+          <span>
+            {val || '-'}
+          </span>
+        )
+      },
+      {
+        // title: '邮箱',
+        title: formatMessage({ id: 'enterpriseUser.table.email' }),
+        dataIndex: 'email',
+        rowKey: 'email',
+        align: 'center',
+        render: (val, data) => (
+          <span>
+            {val || '-'}
+          </span>
+        )
+      },
+      {
+        // title: '创建时间',
+        title: formatMessage({ id: 'enterpriseUser.table.time' }),
+        dataIndex: 'create_time',
+        rowKey: 'create_time',
+        align: 'center',
+        render: val => {
+          return (
+            <span>
+              {moment(val)
+                .locale('zh-cn')
+                .format('YYYY-MM-DD HH:mm:ss')}
+            </span>
+          );
+        }
+      },
+      {
+        // title:'操作',
+        title: formatMessage({ id: 'enterpriseUser.table.handle' }),
+        dataIndex: 'user_id',
+        align: 'center',
+        rowKey: 'user_id',
+        render: (val, item) => {
+          if(item.nick_name == user.user_name){
+            return [
+              <a
+                onClick={() => {
+                  this.handleEdit(item);
+                }}
+              >
+                {/* 编辑 */}
+                <FormattedMessage id='button.edit' />
+              </a>
+            ];
+          }else{
+            return [
+              <a
+                onClick={() => {
+                  this.delUser(item);
+                }}
+              >
+                {/* 删除 */}
+                <FormattedMessage id='button.delete' />
+              </a>,
+              <a
+                onClick={() => {
+                  this.handleEdit(item);
+                }}
+              >
+                {/* 编辑 */}
+                <FormattedMessage id='button.edit' />
+              </a>
+            ];
+          }
+
+        }
+      }
+    ];
+
+    return (
+      <PageHeaderLayout
+        title={<FormattedMessage id='enterpriseUser.PageHeaderLayout.title' />}
+        content={<FormattedMessage id='enterpriseUser.PageHeaderLayout.content' />}
+        titleSvg={pageheaderSvg.getPageHeaderSvg('users', 18)}
+      >
+        {delVisible && (
+          <ConfirmModal
+            onOk={this.handleDelete}
+            title={formatMessage({ id: 'confirmModal.user.delete.title' })}
+            subDesc={formatMessage({ id: 'confirmModal.delete.strategy.subDesc' })}
+            desc={formatMessage({ id: 'confirmModal.delete.user.desc' })}
+            onCancel={this.cancelDelUser}
+          />
+        )}
+        {userVisible && (
+          <CreatUser
+            eid={eid}
+            loading={Loading}
+            userInfo={userInfo}
+            title={text}
+            onOk={this.handleUser}
+            onCancel={this.canceUser}
+          />
+        )}
+        {currentUserInfo && (
+          <CurrentTeams
+            eid={eid}
+            userInfo={currentUserInfo}
+            onCancel={() => {
+              this.handleCurrentUserId(false);
+            }}
+          />
+        )}
+        <div>
+          {/* 搜索栏和按钮 */}
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+            <Search
+              placeholder={formatMessage({ id: 'placeholder.searchUser.user' })}
+              onSearch={this.handleSearch}
+              onChange={e => this.handelChange(e.target.value)}
+              style={{ width: 300, marginRight: 16 }}
+            />
+            <div style={{ flex: 1, textAlign: 'right' }}>
+              {adminer && (
+                <Button type="primary" icon="plus" onClick={this.addUser}>
+                  <FormattedMessage id='enterpriseUser.button.adduser' />
+                </Button>
+              )}
+            </div>
+          </div>
+          {/* 表格 */}
+          <Table
+            rowKey="user_id"
+            pagination={{
+              current: page,
+              pageSize,
+              total,
+              onChange: this.onPageChange,
+              showQuickJumper: true,
+              showSizeChanger: true,
+              showTotal: (total) => `共 ${total} 条`,
+              onShowSizeChange: this.onPageChange,
+              hideOnSinglePage: total <= 10
+            }}
+            dataSource={adminList}
+            columns={columns}
+          />
+        </div>
+      </PageHeaderLayout>
+    );
+  }
+}

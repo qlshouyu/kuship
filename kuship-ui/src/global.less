@@ -1,0 +1,220 @@
+// CSS 变量定义 - 供 systemjs 加载的插件使用
+:root {
+  // 主题色
+  --rbd-primary-color: @primary-color;
+  --rbd-success-color: @success-color;
+  --rbd-warning-color: @warning-color;
+  --rbd-error-color: @error-color;
+
+  // 文字色
+  --rbd-heading-color: @heading-color;
+  --rbd-text-color: @text-color;
+  --rbd-text-color-secondary: @text-color-secondary;
+  --rbd-label-color: @label-color;
+
+  // 边框和背景
+  --rbd-border-color-base: @border-color-base;
+  --rbd-background-color: @rbd-background-color;
+  --rbd-label-color-secondary: @rbd-label-color;
+
+  // 阴影
+  --rbd-card-shadow: @rbd-card-shadow;
+  --rbd-card-shadow-hover: @rbd-card-shadow-hover;
+
+  // 字体大小
+  --rbd-title-size: @rbd-title-size;
+  --rbd-sub-title-size: @rbd-sub-title-size;
+  --rbd-content-size: @rbd-content-size;
+  --rbd-auxiliary-size: @rbd-auxiliary-size;
+
+  // 状态色
+  --rbd-success-status: @rbd-success-status;
+  --rbd-error-status: @rbd-error-status;
+  --rbd-warning-status: @rbd-warning-status;
+  --rbd-down-status: @rbd-down-status;
+  --rbd-processing-status: @rbd-processing-status;
+}
+
+// Now 字体引入
+@font-face {
+  font-family: 'Now';
+  src: url('./assets/fonts/now.black.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+html,
+body,
+#root {
+  height  : 100%;
+  position: relative;
+  z-index : 2;
+}
+
+.ant-layout {
+  min-height: 100%;
+}
+
+canvas {
+  display: block;
+}
+
+body {
+  text-rendering         : optimizeLegibility;
+  -webkit-font-smoothing : antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.globalSpin {
+  width : 100%;
+  margin: 40px 0 !important;
+}
+.ant-spin-container {
+  overflow: visible !important;
+}
+
+// 添加 notification 文字换行样式
+.ant-notification-notice-message,
+.ant-notification-notice-description {
+  word-break: break-all !important;
+}
+
+// 隐藏 Modal 滚动条
+.ant-modal-body {
+  &::-webkit-scrollbar {
+    display: none; // Chrome, Safari, Edge
+  }
+  -ms-overflow-style: none;  // IE 10+
+  scrollbar-width: none;  // Firefox
+}
+
+// 优化垂直表单的 label 样式,增强视觉层次
+.ant-form-vertical {
+  .ant-form-item {
+    margin-bottom: 8px; // 增加表单项之间的间距
+  }
+
+  .ant-form-item-label {
+    // padding-bottom: 8px; // 增加 label 与输入框的间距
+
+    > label {
+      font-size: 15px; // 稍微增大字号
+      font-weight: 600;
+      color: @heading-color;
+      line-height: 24px;
+
+      &::after {
+        display: none; // 隐藏冒号
+      }
+
+      // 必填星号样式
+      .ant-form-item-required::before {
+        color: @error-color;
+        font-weight: 600;
+      }
+    }
+  }
+
+  // 输入框样式优化
+  .ant-input {
+    height: 40px; // 增加输入框高度
+    padding: 8px 12px; // 增加内边距
+    font-size: 14px;
+    color: @text-color;
+    border-radius: 8px;
+
+    &:focus {
+      box-shadow: 0 0 0 2px fade(@primary-color, 20%);
+    }
+  }
+
+  // TextArea 样式
+  .ant-input-textarea textarea {
+    padding: 8px 12px;
+    font-size: 14px;
+    border-radius: 8px;
+
+    &:focus {
+      box-shadow: 0 0 0 2px fade(@primary-color, 20%);
+    }
+  }
+
+  // Select 样式
+  .ant-select-selection {
+    height: 40px; // 增加选择框高度
+    font-size: 14px;
+    border-radius: 8px;
+
+    &__rendered {
+      line-height: 38px;
+    }
+  }
+
+  .ant-select-selection--single {
+    height: 40px;
+
+    .ant-select-selection__rendered {
+      line-height: 40px;
+    }
+  }
+
+  // Radio 和 Checkbox 样式
+  .ant-radio-wrapper,
+  .ant-checkbox-wrapper {
+    font-size: 14px;
+  }
+
+  // 帮助文字样式
+  .ant-form-explain,
+  .ant-form-extra {
+    font-size: 12px;
+    color: @text-color-secondary;
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  // 提交按钮样式优化
+  .ant-btn-primary {
+    height: 40px;
+    padding: 0 24px;
+    font-size: 15px;
+    font-weight: 500;
+    border-radius: 4px;
+  }
+
+  .ant-btn {
+    height: 40px;
+    padding: 0 20px;
+    font-size: 14px;
+    border-radius: 4px;
+  }
+}
+
+// CodeMirror 全局样式
+.CodeMirror-scroll {
+  height: 104% !important;
+}
+
+.CodeMirror-line {
+  line-height: 22px !important;
+}
+
+.CodeMirror-fullscreen {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: auto;
+  width: 100% !important;
+  z-index: 9;
+}
+
+.CodeMirror-sizer {
+  padding-top: 40px;
+}
+
+.CodeMirror-linenumber {
+  line-height: 22px !important;
+}
