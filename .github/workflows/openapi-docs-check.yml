@@ -1,0 +1,54 @@
+# OpenAPI v1 docs check (add-openapi-swagger-ui).
+#
+# Runs the OpenApiDocsIntegrationTest and uploads the generated OpenAPI 3 JSON as a
+# build artifact, so PR reviewers can diff API surface changes (added/removed endpoints,
+# security scheme changes, response shape drift) without booting the app locally.
+#
+# This is a stub; enable when the repository's GitHub Actions are wired up. Once the
+# OpenAPI JSON is stable across runs, consider promoting the diff to a PR comment using
+# a third-party action (e.g. tj-actions/changed-files + jq).
+name: openapi-docs-check
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'kuship-console/src/main/java/cn/kuship/console/modules/openapi/**'
+      - 'kuship-console/src/main/java/cn/kuship/console/modules/openapi/docs/**'
+      - 'kuship-console/pom.xml'
+  workflow_dispatch:
+
+jobs:
+  openapi-docs:
+    name: Generate and verify OpenAPI v1 JSON
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run OpenAPI docs integration test
+        working-directory: kuship-console
+        run: mvn -B -Dtest=OpenApiDocsIntegrationTest test
+
+      - name: Generate fresh OpenAPI JSON
+        working-directory: kuship-console
+        run: |
+          # Boot the app on the local profile, curl the JSON, kill the process.
+          mvn -B -DskipTests spring-boot:start
+          sleep 5
+          curl -fsSL http://localhost:8080/openapi/v3/api-docs/v1 -o openapi-v1.json
+          mvn -B spring-boot:stop || true
+
+      - name: Upload OpenAPI JSON artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-v1-json
+          path: kuship-console/openapi-v1.json
+          if-no-files-found: error

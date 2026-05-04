@@ -1,0 +1,176 @@
+spring:
+  application:
+    name: kuship-console
+
+  # add-openapi-swagger-ui: Springdoc 2.x's QueryDSL operation customizer references
+  # org.springframework.data.util.TypeInformation, which Spring Data 4 (shipped with Spring
+  # Boot 4) relocated. The customizer is unused (we don't expose any QuerydslPredicate
+  # parameters from /openapi/v1/**), so excluding the auto-configuration removes the dead
+  # reflection path without losing functionality.
+  autoconfigure:
+    exclude:
+      - org.springdoc.core.configuration.SpringDocDataRestConfiguration
+
+  # Spring AOT — 默认 false（fat jar 启动）；mvn -Pnative package 时 plugin 自动设 true。
+  # 不要在 dev 模式下开启，否则会触发不必要的 AOT 处理。
+  aot:
+    enabled: ${SPRING_AOT:false}
+
+  # Default profile is intentionally credential-less. Use profile=local for dev,
+  # or supply DB_URL/DB_USERNAME/DB_PASSWORD via environment in deployed envs.
+  datasource:
+    url: ${DB_URL:}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 10000
+
+  jpa:
+    # CRITICAL: shared schema with rainbond-console (Django migrations own DDL).
+    # Never let Hibernate emit DDL.
+    hibernate:
+      ddl-auto: validate
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyJpaCompliantImpl
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: false
+        # GraalVM Native 兼容性：关闭 ByteBuddy 字节码增强（运行时类生成 ≠ native image）。
+        # 代价是 ~5% 性能损失（lazy load 退化为 eager load）；本项目所有关联手动 join，影响为零。
+        # 字节码增强关闭后 ddl-auto=validate 仍正常工作。
+        jakarta.persistence.bytecode.strategy: none
+        bytecode:
+          use_reflection_optimizer: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+    # Schema validation only; no business tables shipped from kuship-console side.
+    validate-on-migrate: false
+
+# Springdoc OpenAPI (add-openapi-swagger-ui).
+# Both api-docs and swagger-ui endpoints are gated by kuship.openapi.docs.enabled, which defaults
+# to false at the top-level (prod-safe). application-local.yaml and application-contract-test.yaml
+# flip it to true. Production may temporarily enable via env: KUSHIP_OPENAPI_DOCS_ENABLED=true.
+springdoc:
+  api-docs:
+    enabled: ${kuship.openapi.docs.enabled:false}
+    path: /openapi/v3/api-docs
+  swagger-ui:
+    enabled: ${kuship.openapi.docs.enabled:false}
+    path: /openapi/swagger-ui/index.html
+    # Pre-pin "v1" group so the dropdown defaults correctly when only one group is present.
+    groups-order: ASC
+    operations-sorter: alpha
+    tags-sorter: alpha
+    config-url: /openapi/v3/api-docs/swagger-config
+
+server:
+  port: 8080
+  # Do NOT set servlet.context-path: kuship hosts /console, /openapi, /app-server, /api at root.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+kuship:
+  security:
+    jwt:
+      # Must match rainbond-console's SECRET_KEY (djangorestframework-jwt 1.11.0). Inject via env.
+      secret-key: ${JWT_SECRET_KEY:}
+      # rainbond-console's `views/base.py` accepts both 'GRJWT' (primary) and 'jwt' (lowercase, external portals).
+      auth-header-prefixes: GRJWT,jwt
+      algorithm: HS256
+      leeway-seconds: 0
+      # rainbond-console 历史选择 3650 天（≈10 年）作为默认 TTL；生产部署应下调
+      expiration-days: 3650
+    # 是否允许未授权访问 /console/init/perms（默认 false，仅运维场景临时开启）
+    allow-public-init: false
+
+  pagination:
+    default-page-size: 10
+    max-page-size: 200
+
+  region:
+    # Connect/socket timeout when calling Rainbond Go cluster API. Default 5s aligns with Python.
+    timeout-seconds: 5
+    # Verify the cluster's TLS certificate. dev=false (matches Python REGION_SSL_VERIFY=false). Production must set true.
+    ssl-verify: false
+    # 0 means auto = cpu_count() * 5 (matches Python multiprocessing.cpu_count() * 5).
+    connection-pool-max-per-route: 0
+    # Body messages indicating "frequent operation" — return RegionApiFrequentException instead of generic error.
+    frequent-operation-messages:
+      - "操作过于频繁，请稍后再试"
+      - "wait a moment please"
+      - "just wait a moment"
+
+  openapi:
+    # Master switch for Swagger UI / OpenAPI 3 JSON. Default false → prod-safe.
+    # application-local.yaml and application-contract-test.yaml flip it to true.
+    docs:
+      enabled: false
+
+  # SMS gateway (add-aliyun-sms). Default provider=logging — prints code to stdout instead of
+  # sending real SMS, which is dev-safe and lets contract-test profile run without aliyun creds.
+  # Switch to provider=aliyun in prod profile + populate aliyun.* via env / yaml.
+  sms:
+    provider: logging
+    aliyun:
+      access-key-id: ${ALIYUN_SMS_ACCESS_KEY_ID:}
+      access-key-secret: ${ALIYUN_SMS_ACCESS_KEY_SECRET:}
+      sign-name: ""
+      template-code: ""
+      endpoint: dysmsapi.aliyuncs.com
+    rate-limit:
+      # 60s per-phone send rate limit. Off in dev (so integration tests can flood quickly).
+      enabled: false
+      window-seconds: 60
+    verify-failure:
+      # 5-min sliding window, 5 misses → lock.
+      max-failures: 5
+      window-seconds: 300
+
+  # MCP (add-mcp-sse). Defaults are dev/local-friendly: small session capacity, fast heartbeat.
+  mcp:
+    protocol-version: 2024-11-05
+    server-name: kuship-console
+    server-version: 0.1.0
+    # In-memory session cap. Multi-replica deployments need nginx ip_hash to keep clients on
+    # one replica because SSE state is not shared across instances (see CLAUDE.md). Tune up
+    # alongside `server.tomcat.threads.max` since each session pins a servlet thread.
+    max-sessions: 200
+    session-ttl-minutes: 30
+    heartbeat-seconds: 25
+
+  # Gray release (add-gray-release). Per-app concurrency is enforced application-side
+  # (no DB unique index yet — see design.md Decision 2).
+  gray-release:
+    # Max number of ACTIVE records allowed per (tenant_id, app_id). Currently only 1 is
+    # tested; raising it is a future hardening (`add-grayrelease-multi-active`).
+    max-active-per-app: 1
+    # When true, GrayReleaseService skips the apisix-route weight update HTTP call.
+    # Used by integration tests so they don't need a live rainbond-go core. Production
+    # must keep this false (the default).
+    skip-apisix-update: false
+
+logging:
+  level:
+    root: INFO
+    cn.kuship.console: INFO
+  pattern:
+    # Surface MDC traceId in console logs for cross-request correlation.
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%X{traceId:-}] [%t] %-40.40logger{39} : %m%n%wEx"

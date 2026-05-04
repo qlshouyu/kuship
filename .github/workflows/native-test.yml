@@ -1,0 +1,65 @@
+# GraalVM Native test job (harden-native-tests).
+#
+# Stub workflow — the repo may not have GitHub Actions wired up yet, so this file is shipped
+# as a ready-to-enable template. Once Actions are turned on, the job will:
+#
+#   1. Install GraalVM 21 community via the graalvm/setup-graalvm action.
+#   2. Restore the Maven local repository cache.
+#   3. Invoke `bash scripts/native-test.sh` from the repo root.
+#   4. Surface the [SUMMARY] and [HINT-MISSING] lines as job logs.
+#
+# Initial release flags `continue-on-error: true` so that flaky native bootstrap or known Spring
+# Boot 4 + Mockito 5 + GraalVM 21 community combinations cannot block the main JVM test gate.
+# When the native pass rate stays >= 90 % for two consecutive weeks, drop continue-on-error and
+# promote this job to a required check.
+name: native-test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  native-test:
+    name: Run JUnit 5 inside GraalVM native image
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true   # TODO(harden-native-tests): remove once pass rate >= 90 % for 2 weeks
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]   # amd64 + arm64 coverage
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up GraalVM 21 community
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: 'true'
+
+      - name: Cache Maven local repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ runner.arch }}-mvn-native-${{ hashFiles('kuship-console/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-mvn-native-
+
+      - name: Run native tests
+        run: bash scripts/native-test.sh
+        env:
+          # Force aliyun mirror only when an explicit settings file is provided in the runner.
+          KUSHIP_MVN_SETTINGS: ${{ env.KUSHIP_MVN_SETTINGS }}
+
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-${{ runner.os }}-${{ runner.arch }}
+          path: kuship-console/target/surefire-reports/**
+          if-no-files-found: ignore

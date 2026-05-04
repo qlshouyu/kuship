@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.6</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>cn.kuship</groupId>
+    <artifactId>kuship-console</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>kuship-console</name>
+    <description>kuship console backend (Spring Boot replacement for rainbond-console)</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <jjwt.version>0.12.6</jjwt.version>
+        <querydsl.version>5.1.0</querydsl.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
+        <kubernetes-client.version>21.0.2</kubernetes-client.version>
+        <httpclient5.version>5.4.1</httpclient5.version>
+        <bouncycastle.version>1.79</bouncycastle.version>
+        <springdoc.version>2.8.0</springdoc.version>
+        <aliyun-sms.version>3.0.0</aliyun-sms.version>
+    </properties>
+
+    <dependencies>
+        <!-- Web / JPA / Security / Actuator / Validation -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Database / Migration -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+
+        <!-- JWT (placeholder; auth wired in next change) -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jjwt.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- QueryDSL JPA (Jakarta classifier required for Spring Boot 3+/4) -->
+        <dependency>
+            <groupId>com.querydsl</groupId>
+            <artifactId>querydsl-jpa</artifactId>
+            <version>${querydsl.version}</version>
+            <classifier>jakarta</classifier>
+        </dependency>
+
+        <!-- MapStruct -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${mapstruct.version}</version>
+        </dependency>
+
+        <!-- Kubernetes client (placeholder; rke2 module wires it later) -->
+        <dependency>
+            <groupId>io.kubernetes</groupId>
+            <artifactId>client-java</artifactId>
+            <version>${kubernetes-client.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Apache HttpClient 5: used by Region API client for mTLS HTTP calls to Rainbond Go cluster -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <version>${httpclient5.version}</version>
+        </dependency>
+
+        <!-- AOP for @RequirePerm / @RequireEnterpriseAdmin annotations -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-aop</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjweaver</artifactId>
+        </dependency>
+
+        <!-- Cache (用于 user-team-perms / user-enterprise-admin 60s 缓存) -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context-support</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <!--
+            Springdoc OpenAPI 3 (add-openapi-swagger-ui).
+            Generates /openapi/v3/api-docs JSON + /openapi/swagger-ui/* UI from the
+            cn.kuship.console.modules.openapi.v1 controller package only.
+            Disabled by default in prod; toggle via kuship.openapi.docs.enabled.
+        -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+        <!--
+            kotlin-reflect (runtime only) — Springdoc detects Kotlin stdlib transitively pulled in
+            by Spring Framework 7, then probes kotlin.reflect.full.KClasses to support Kotlin DSL
+            request mappings. Without kotlin-reflect on the classpath, Springdoc throws
+            NoClassDefFoundError when generating the OpenAPI JSON (as of 2.8.0 / Spring Boot 4).
+            We add kotlin-reflect at runtime scope only; the project itself stays Java-only.
+        -->
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-reflect</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!--
+            Aliyun SMS SDK (add-aliyun-sms). Activated only when kuship.sms.provider=aliyun;
+            dev / local / contract-test profiles fall back to LoggingSmsProvider so the dependency
+            stays harmless on the classpath but doesn't hit the aliyun control plane.
+        -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>dysmsapi20170525</artifactId>
+            <version>${aliyun-sms.version}</version>
+        </dependency>
+
+        <!-- BouncyCastle: PEM private key parsing (PKCS#8 / PKCS#1) for Region API mTLS in-memory KeyStore -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
+        </dependency>
+
+        <!-- Lombok (compile-only) -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Spring Boot 4 拆分了 web slice 测试支持：@WebMvcTest 已迁出 spring-boot-test-autoconfigure -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+            Native-friendly Mockito (harden-native-tests).
+            Mockito 5.x already ships the inline mock maker as the default via mockito-core, so no
+            explicit mockito-inline dependency is needed — that artifact is deprecated. Instead we
+            pin the mock maker plugin via src/test/resources/mockito-extensions/org.mockito.plugins.MockMaker
+            to make the GraalVM native compatibility path explicit.
+
+            All @MockitoBean targets in this codebase mock interfaces (region API ops), so no final
+            class / static method mocking workarounds are required.
+        -->
+    </dependencies>
+
+    <build>
+        <finalName>kuship-console</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <release>${java.version}</release>
+                    <parameters>true</parameters>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                        <path>
+                            <groupId>com.querydsl</groupId>
+                            <artifactId>querydsl-apt</artifactId>
+                            <version>${querydsl.version}</version>
+                            <classifier>jakarta</classifier>
+                        </path>
+                        <path>
+                            <groupId>jakarta.persistence</groupId>
+                            <artifactId>jakarta.persistence-api</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                    <!--
+                        MapStruct compiler args (defaultComponentModel=spring, unmappedTargetPolicy=ERROR)
+                        会在添加首个 @Mapper 类时引入；当前 change 没有任何 mapper，编译器会把这些 arg
+                        当作未识别选项报 warning。等首个 mapper 落地时一并加回。
+                    -->
+                    <compilerArgs>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!--
+        GraalVM Native Image profile (enable-graalvm-native, 13/13 phase).
+
+        默认 mvn package 仍产 fat jar；仅 mvn -Pnative package 触发 native build。
+        前 12 阶段已刻意为此铺路（不上 SSE / reactor / 复杂反射），现做最后启用。
+
+        前置条件：本地已安装 GraalVM 21 community（macOS: sdk install java 21.0.2-graalce）。
+    -->
+    <profiles>
+        <profile>
+            <id>native</id>
+            <properties>
+                <spring.aot.enabled>true</spring.aot.enabled>
+                <!-- skip surefire for the default `native package` flow; users wanting native tests
+                     opt in to the `native-test` profile below. -->
+                <skipTests>true</skipTests>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <configuration>
+                            <imageName>kuship-console</imageName>
+                            <buildArgs>
+                                <buildArg>--enable-url-protocols=http,https</buildArg>
+                                <buildArg>-H:+AddAllCharsets</buildArg>
+                                <buildArg>-H:IncludeResources=db/migration/.*\.sql</buildArg>
+                                <buildArg>-H:IncludeResources=application.*\.yaml</buildArg>
+                                <!-- add-openapi-swagger-ui: ship swagger-ui webjar in native binary by default. -->
+                                <buildArg>-H:IncludeResources=META-INF/resources/webjars/swagger-ui/.*</buildArg>
+                                <buildArg>-H:IncludeResources=META-INF/swagger/.*\.json</buildArg>
+                                <buildArg>--initialize-at-build-time=org.bouncycastle</buildArg>
+                                <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
+                                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                            </buildArgs>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>process-aot</id>
+                                <goals>
+                                    <goal>process-aot</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+            add-openapi-swagger-ui: trim swagger-ui webjar from the native binary for size-sensitive
+            deployments (edge / IoT). Inherits everything from `native` but removes the webjar
+            include pattern via Maven's <combine.self="override"> trick — easiest implementation:
+            override <buildArgs> entirely. Users opt in via `mvn -Pnative-no-swagger package`.
+        -->
+        <profile>
+            <id>native-no-swagger</id>
+            <properties>
+                <spring.aot.enabled>true</spring.aot.enabled>
+                <skipTests>true</skipTests>
+                <kuship.openapi.docs.enabled>false</kuship.openapi.docs.enabled>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <configuration>
+                            <imageName>kuship-console</imageName>
+                            <buildArgs combine.self="override">
+                                <buildArg>--enable-url-protocols=http,https</buildArg>
+                                <buildArg>-H:+AddAllCharsets</buildArg>
+                                <buildArg>-H:IncludeResources=db/migration/.*\.sql</buildArg>
+                                <buildArg>-H:IncludeResources=application.*\.yaml</buildArg>
+                                <buildArg>--initialize-at-build-time=org.bouncycastle</buildArg>
+                                <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
+                                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                            </buildArgs>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>process-aot</id>
+                                <goals>
+                                    <goal>process-aot</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+            Native test profile (harden-native-tests, follow-up to enable-graalvm-native).
+            Activate together with `native`: `mvn -Pnative,native-test test`.
+            Differences vs. the plain `native` profile:
+              - skipTests=false (run JUnit 5 surefire under native image)
+              - native-maven-plugin extends buildArgs with Mockito-specific run-time init flags,
+                test resource includes, and the test-only application-native-test.yaml.
+              - surefire forks each class under a JVM that allows native access (avoids Java 24
+                "restricted method" warnings from the Mockito agent).
+        -->
+        <profile>
+            <id>native-test</id>
+            <properties>
+                <spring.aot.enabled>true</spring.aot.enabled>
+                <skipTests>false</skipTests>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <configuration>
+                            <imageName>kuship-console-test</imageName>
+                            <buildArgs combine.children="append">
+                                <buildArg>--initialize-at-run-time=org.mockito.internal.creation.bytebuddy.MockMethodAdvice</buildArg>
+                                <buildArg>--initialize-at-run-time=org.mockito.internal.creation.bytebuddy.SubclassByteBuddyMockMaker</buildArg>
+                                <buildArg>-H:IncludeResources=application-native-test.*\.yaml</buildArg>
+                                <buildArg>-H:IncludeResources=META-INF/spring/aot.factories</buildArg>
+                            </buildArgs>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <argLine>--enable-native-access=ALL-UNNAMED</argLine>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

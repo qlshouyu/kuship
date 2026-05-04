@@ -1,0 +1,22 @@
+# Profile activated only by the `native-test` Maven profile and tests that explicitly opt in via
+# @TestPropertySource("classpath:application-native-test.yaml") or @ActiveProfiles("native-test").
+#
+# Goals:
+#   1. Pin server.port=0 so DEFINED_PORT mode still gets a free OS port (avoids RANDOM_PORT
+#      flakiness in Spring Boot 4 native image bootstrap, GH-44982).
+#   2. Tighten log levels so native test output stays digestible by scripts/native-test.sh
+#      which greps for ClassNotFoundException / NoSuchMethodException for hint diagnostics.
+#   3. Keep AOT enabled — native-image build always sets spring.aot.enabled=true.
+server:
+  port: 0
+
+spring:
+  aot:
+    enabled: true
+
+logging:
+  level:
+    root: WARN
+    cn.kuship.console: INFO
+    org.springframework.test: WARN
+    org.hibernate.SQL: WARN

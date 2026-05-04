@@ -1,0 +1,14 @@
+target/
+*.iml
+*.iws
+*.ipr
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+HELP.md
+
+# Local-only Spring profile with DB credentials. Never commit.
+src/main/resources/application-local.yaml

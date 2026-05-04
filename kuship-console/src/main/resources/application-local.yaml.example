@@ -1,0 +1,26 @@
+# Template for application-local.yaml (the real file is gitignored).
+# Copy to application-local.yaml and fill in your local credentials.
+#
+# Activate:  mvn spring-boot:run -Dspring-boot.run.profiles=local
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/console?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+    username: root
+    password: <your-password>
+
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+kuship:
+  security:
+    jwt:
+      # Must match rainbond-console SECRET_KEY in production; any string works for local dev.
+      secret-key: <your-shared-jwt-secret-key>
+
+logging:
+  level:
+    cn.kuship.console: DEBUG
+    org.hibernate.SQL: DEBUG

@@ -6,6 +6,7 @@ kubernetes管理系统
 - `kuship-ui/` —— kuship 控制台前端（基于 rainbond-ui 拷贝起步，独立演进）。开发态默认对接 `add-docker-compose-stack` 启动的 rainbond-console 测试实例（`http://localhost:7070`）；切换到 kuship-console 通过 `CONSOLE_PROXY_TARGET` 环境变量覆盖。
 - `reference/` —— Rainbond 上游代码（git submodule，只读，作为对照参考）。
 - `standalone/`、`docker/` —— standalone 镜像与 docker-compose 开发栈相关资产。
+- `rke2/` —— 多节点 RKE2 离线部署脚本与配置（详见 `rke2/README.md`）。
 - `openspec/` —— OpenSpec 规范与变更提案。详见各子目录下的 `proposal.md` / `tasks.md`。
 
 ## standalone 镜像制作
@@ -27,5 +28,32 @@ kubernetes管理系统
 ./standalone_build.sh
 docker compose -f docker/docker-compose.yaml up -d
 ```
+
+## RKE2 多节点部署
+生产环境 1×server + N×agent 拓扑，使用与 standalone 同构的离线交付路径，详见 [`rke2/README.md`](rke2/README.md)。
+
+```bash
+./rke2_build.sh                 # 默认：复用已存在的 rke2-bundle-<arch>.tar.zst
+./rke2_build.sh enable_proxy=1  # 国内开发者：本机已开 127.0.0.1:7897 代理
+./rke2_build.sh force_rebuild=1 # 升级 RKE2 版本后强制重打
+```
+
+产物 `rke2-bundle-<arch>.tar.zst`（约 1.5 GB）。把它分发到 server / agent 节点解包后：
+
+```bash
+sudo ./server-install.sh                                     # server 节点
+sudo RKE2_URL=... RKE2_TOKEN=... ./agent-install.sh          # agent 节点
+```
+
+需放行的端口（详细见 `rke2/README.md`）：
+
+| 端口 | 协议 | 用途 |
+|------|------|------|
+| 6443  | TCP | Kubernetes API |
+| 9345  | TCP | RKE2 supervisor（agent 注册） |
+| 10250 | TCP | kubelet |
+| 8472  | UDP | Flannel/Canal VXLAN（pod 跨节点网络） |
+
+> 安装完成后，在 server 节点 `cat /etc/rancher/rke2/rke2.yaml` 取 kubeconfig，把其中 `127.0.0.1` 替换为 server 节点对外 IP，即可在 kuship-console 通过「集群接入 → 通过 kubeconfig 接入」完成 region 注册。本期不修改 console / UI 代码，仅交付离线脚本。
 
 ## 其他

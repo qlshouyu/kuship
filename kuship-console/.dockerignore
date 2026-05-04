@@ -1,0 +1,14 @@
+target/
+**/target/
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+HELP.md
+README.md
+CLAUDE.md
+src/main/resources/application-local.yaml
+**/.DS_Store

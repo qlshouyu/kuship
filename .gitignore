@@ -1,1 +1,5 @@
 *.tar.zst
+
+# kuship-console build artifacts and local-only Spring profile
+kuship-console/target/
+kuship-console/**/application-local.yaml

@@ -1,0 +1,7 @@
+# RKE2 agent 节点配置
+# 由 agent-install.sh 拷贝到 /etc/rancher/rke2/config.yaml
+# server / token 两行由 install 脚本注入或替换，请勿在此硬编码
+
+node-name: kuship-agent-1
+# server: <由 agent-install.sh 注入 https://<server-ip>:9345>
+# token:  <由 agent-install.sh 注入 server 节点 node-token>

@@ -1,0 +1,21 @@
+# RKE2 server 节点配置
+# 由 server-install.sh 拷贝到 /etc/rancher/rke2/config.yaml
+# 节点名 / TLS SAN 可按需修改后再次运行 install --force 生效
+
+node-name: kuship-server-1
+
+# 关闭默认 ingress（rainbond 自带网关），保留 coredns / metrics-server 等
+disable:
+  - rke2-ingress-nginx
+
+# kubeconfig 默认 0600，调成 0644 让运维直接 cat
+write-kubeconfig-mode: "0644"
+
+# 默认 CIDR；若与既有网络冲突可在此覆盖
+cluster-cidr: 10.42.0.0/16
+service-cidr: 10.43.0.0/16
+
+# 增加额外 SAN，便于运维通过外网域名访问 6443
+# tls-san:
+#   - kuship.example.com
+#   - 203.0.113.10

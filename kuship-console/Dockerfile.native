@@ -1,0 +1,35 @@
+# GraalVM Native Image 多阶段构建（enable-graalvm-native，13/13 phase）。
+#
+# 第 1 阶段：用 GraalVM 21 community 镜像编译 native binary。
+# 第 2 阶段：用 distroless base 装载 binary，运行时镜像 ~80MB。
+#
+# 使用：
+#   docker build -f Dockerfile.native -t kuship-console-native .
+#   docker run -p 8080:8080 -e DB_URL=... -e JWT_SECRET_KEY=... kuship-console-native
+
+# Stage 1: build native binary
+FROM ghcr.io/graalvm/native-image-community:21 AS builder
+
+WORKDIR /build
+
+# Maven wrapper（如不存在 fall back 到 maven cli；用户可在 .mvn 提交）
+COPY pom.xml ./
+COPY src ./src
+
+# 安装 maven（GraalVM 镜像不带 maven）
+RUN microdnf install -y maven && microdnf clean all
+
+# 离线下载依赖（缓存优化）
+RUN mvn -B dependency:go-offline -Pnative
+
+# native build：跳过 test，仅编译 + 链接
+RUN mvn -B -Pnative -DskipTests package
+
+# Stage 2: distroless runtime
+FROM gcr.io/distroless/base-debian12
+
+COPY --from=builder /build/target/kuship-console /app/kuship-console
+
+EXPOSE 8080
+
+ENTRYPOINT ["/app/kuship-console"]

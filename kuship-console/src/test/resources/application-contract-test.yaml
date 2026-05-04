@@ -1,0 +1,8 @@
+# contract-test profile (used by ContractIntegrationTest and most @ActiveProfiles({"local","contract-test"}) ITs).
+#
+# add-openapi-swagger-ui: enable Swagger UI for tests that need to assert /openapi/v3/api-docs JSON
+# shape. Existing integration tests are unaffected because their assertions never hit Springdoc paths.
+kuship:
+  openapi:
+    docs:
+      enabled: true
