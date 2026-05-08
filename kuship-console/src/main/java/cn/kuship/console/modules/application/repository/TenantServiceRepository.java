@@ -11,4 +11,5 @@ public interface TenantServiceRepository extends JpaRepository<TenantService, In
     Optional<TenantService> findByTenantIdAndServiceAlias(String tenantId, String serviceAlias);
     List<TenantService> findByTenantId(String tenantId);
     List<TenantService> findByServiceIdIn(List<String> serviceIds);
+    List<TenantService> findByServiceRegionAndTenantId(String serviceRegion, String tenantId);
 }

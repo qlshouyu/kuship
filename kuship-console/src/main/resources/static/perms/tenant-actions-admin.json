@@ -1,0 +1,219 @@
+{
+  "team": {
+    "sub_models": [
+      {
+        "team_overview": {
+          "sub_models": [],
+          "perms": [
+            {
+              "describe": true
+            },
+            {
+              "app_list": true
+            }
+          ]
+        }
+      },
+      {
+        "team_app_create": {
+          "sub_models": [],
+          "perms": [
+            {
+              "describe": true
+            }
+          ]
+        }
+      },
+      {
+        "team_app_manage": {
+          "sub_models": [],
+          "perms": {}
+        }
+      },
+      {
+        "team_gateway_manage": {
+          "sub_models": [
+            {
+              "team_gateway_monitor": {
+                "sub_models": [],
+                "perms": [
+                  {
+                    "describe": true
+                  }
+                ]
+              }
+            },
+            {
+              "team_route_manage": {
+                "sub_models": [],
+                "perms": [
+                  {
+                    "describe": true
+                  },
+                  {
+                    "create": true
+                  },
+                  {
+                    "edit": true
+                  },
+                  {
+                    "delete": true
+                  }
+                ]
+              }
+            },
+            {
+              "team_target_services": {
+                "sub_models": [],
+                "perms": [
+                  {
+                    "describe": true
+                  },
+                  {
+                    "create": true
+                  },
+                  {
+                    "edit": true
+                  },
+                  {
+                    "delete": true
+                  }
+                ]
+              }
+            },
+            {
+              "team_certificate": {
+                "sub_models": [],
+                "perms": [
+                  {
+                    "describe": true
+                  },
+                  {
+                    "create": true
+                  },
+                  {
+                    "edit": true
+                  },
+                  {
+                    "delete": true
+                  }
+                ]
+              }
+            }
+          ],
+          "perms": []
+        }
+      },
+      {
+        "team_plugin_manage": {
+          "sub_models": [],
+          "perms": [
+            {
+              "describe": true
+            },
+            {
+              "create": true
+            },
+            {
+              "edit": true
+            },
+            {
+              "delete": true
+            }
+          ]
+        }
+      },
+      {
+        "team_manage": {
+          "sub_models": [
+            {
+              "team_dynamic": {
+                "sub_models": [],
+                "perms": [
+                  {
+                    "describe": true
+                  }
+                ]
+              }
+            },
+            {
+              "team_member": {
+                "sub_models": [],
+                "perms": [
+                  {
+                    "describe": true
+                  },
+                  {
+                    "create": true
+                  },
+                  {
+                    "edit": true
+                  },
+                  {
+                    "delete": true
+                  }
+                ]
+              }
+            },
+            {
+              "team_region": {
+                "sub_models": [],
+                "perms": [
+                  {
+                    "describe": true
+                  },
+                  {
+                    "install": true
+                  },
+                  {
+                    "uninstall": true
+                  }
+                ]
+              }
+            },
+            {
+              "team_role": {
+                "sub_models": [],
+                "perms": [
+                  {
+                    "describe": true
+                  },
+                  {
+                    "create": true
+                  },
+                  {
+                    "edit": true
+                  },
+                  {
+                    "delete": true
+                  }
+                ]
+              }
+            },
+            {
+              "team_registry_auth": {
+                "sub_models": [],
+                "perms": [
+                  {
+                    "describe": true
+                  },
+                  {
+                    "create": true
+                  },
+                  {
+                    "edit": true
+                  },
+                  {
+                    "delete": true
+                  }
+                ]
+              }
+            }
+          ],
+          "perms": []
+        }
+      }
+    ],
+    "perms": []
+  }
+}

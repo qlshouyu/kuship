@@ -83,6 +83,30 @@ public class EnterpriseController {
         return GeneralMessage.ok(serialize(enterprise));
     }
 
+    /** 对齐 rainbond {@code EnterpriseRUDView}（{@code views/enterprise.py:127}）：
+     *  返回 enterprise 字段 + default_region 占位 + EnterpriseConfigService 的配置（kuship 暂不接入，留空）。 */
+    @GetMapping(value = {"/enterprise/{enterprise_id}/info", "/enterprise/{enterprise_id}/info/"})
+    public ApiResult getInfo(@PathVariable("enterprise_id") String enterpriseId) {
+        requireUser();
+        TenantEnterprise enterprise = enterpriseRepo.findByEnterpriseId(enterpriseId)
+                .orElseThrow(() -> new ServiceHandleException(404, "enterprise not found", "企业不存在"));
+        Map<String, Object> ent = serialize(enterprise);
+        ent.put("default_region", Map.of());
+        return GeneralMessage.ok(ent);
+    }
+
+    /** 对齐 rainbond {@code PlatformSettingsView}（{@code views/platform_settings.py:9}）。 */
+    @GetMapping(value = {"/enterprise/{enterprise_id}/platform-settings",
+            "/enterprise/{enterprise_id}/platform-settings/"})
+    public ApiResult platformSettings(@PathVariable("enterprise_id") String enterpriseId) {
+        requireUser();
+        TenantEnterprise enterprise = enterpriseRepo.findByEnterpriseId(enterpriseId)
+                .orElseThrow(() -> new ServiceHandleException(404, "enterprise not found", "企业不存在"));
+        Map<String, Object> bean = new LinkedHashMap<>();
+        bean.put("enable_team_resource_view", Boolean.TRUE.equals(enterprise.getEnableTeamResourceView()));
+        return GeneralMessage.ok(bean);
+    }
+
     @PutMapping(value = {"/enterprise/{enterprise_id}", "/enterprise/{enterprise_id}/"})
     public ApiResult update(@PathVariable("enterprise_id") String enterpriseId,
                               @RequestBody Map<String, Object> body) {

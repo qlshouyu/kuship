@@ -11,13 +11,16 @@ kubernetes管理系统
 
 ## standalone 镜像制作
 ```bash
-./standalone_build.sh                  # 默认：仓库根已有 k3s-images-<arch>.tar.zst 时复用，否则重打
-./standalone_build.sh enable_proxy=1   # 为本进程的 curl/docker 命令导出 http://127.0.0.1:7897 代理
-./standalone_build.sh force_rebuild=1  # 强制重新执行 standalone/images-package.sh，覆盖已有离线包
-./standalone_build.sh -h               # 查看用法
+./standalone_build.sh                          # 默认：仓库根已有 k3s-images-<arch>.tar.zst 时复用，否则重打
+./standalone_build.sh enable_proxy=1           # 为本进程的 curl/docker 命令导出 http://127.0.0.1:7897 代理
+./standalone_build.sh force_rebuild=1          # 强制重新执行 standalone/images-package.sh，覆盖已有离线包
+./standalone_build.sh build_business_images=1  # 同时生成 rainbond-images-<arch>.tar.zst（rainbond 业务镜像离线包，加速 docker-compose 首次启动）
+./standalone_build.sh -h                       # 查看用法
 ```
 
 > 升级 k3s 时只需修改 `standalone/k3s-version.env` 中的 `K3S_VERSION`，再跑 `./standalone_build.sh force_rebuild=1`，离线镜像包与 Dockerfile 内嵌的 k3s 二进制会自动保持同一版本。
+>
+> 升级 rainbond 业务版本时改 `standalone/rainbond-images.env` 中的 `RAINBOND_VERSION`，再跑 `./standalone_build.sh build_business_images=1 force_rebuild=1` 重打业务镜像离线包；`reference/rainbond-chart` 改动后需同步 `RAINBOND_IMAGES` 列表，否则 `business-images-package.sh` 的 chart 校对会立即报错。
 >
 > `enable_proxy=1` 仅在本脚本进程内导出 `HTTP(S)_PROXY` 等变量，影响 `curl` 取 `k3s-images.txt` 与本机 `docker pull`。docker daemon 拉取基础镜像（`alpine/helm:3` / `ubuntu:24.04`）的代理需要在 Docker Desktop 的 Settings → Resources → Proxies 中单独配置，本脚本不会修改它。
 
@@ -25,9 +28,12 @@ kubernetes管理系统
 `docker/docker-compose.yaml` 一键拉起本地开发依赖栈：`redis:8.0-alpine`、`mysql:9`（root 密码 `123456`）以及 `rainbond-dev:v6.7.1-release`。其中 rainbond 镜像由 `standalone/Dockerfile` 构建产出，首次启动前请先运行 `./standalone_build.sh` 以构建镜像并准备好 `k3s-images-<arch>.tar.zst` 离线包。
 
 ```bash
-./standalone_build.sh
+./standalone_build.sh                          # 必需：构建 rainbond-dev 镜像 + k3s 系统镜像离线包
+./standalone_build.sh build_business_images=1  # 可选：再生成 rainbond-images-<arch>.tar.zst，加速首次启动
 docker compose -f docker/docker-compose.yaml up -d
 ```
+
+> 业务镜像离线包缺失时 docker compose 仍可启动（退化为在线拉取），不会阻塞；详见 [`docker/README.md`](docker/README.md)。
 
 ## RKE2 多节点部署
 生产环境 1×server + N×agent 拓扑，使用与 standalone 同构的离线交付路径，详见 [`rke2/README.md`](rke2/README.md)。
@@ -55,5 +61,11 @@ sudo RKE2_URL=... RKE2_TOKEN=... ./agent-install.sh          # agent 节点
 | 8472  | UDP | Flannel/Canal VXLAN（pod 跨节点网络） |
 
 > 安装完成后，在 server 节点 `cat /etc/rancher/rke2/rke2.yaml` 取 kubeconfig，把其中 `127.0.0.1` 替换为 server 节点对外 IP，即可在 kuship-console 通过「集群接入 → 通过 kubeconfig 接入」完成 region 注册。本期不修改 console / UI 代码，仅交付离线脚本。
+
+## 启动
+```bash
+# 在/etc/hosts设置 rbd-api-api映射到本地地址，方便kuship-console调用docker启动的rbd-api
+! sudo sh -c 'grep -q "rbd-api-api" /etc/hosts || echo "127.0.0.1 rbd-api-api" >> /etc/hosts'
+```
 
 ## 其他

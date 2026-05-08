@@ -20,6 +20,8 @@ import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
@@ -35,11 +37,15 @@ import java.util.Map;
 /**
  * 全局异常映射 → general_message 形状响应。
  *
- * <p>HTTP 状态码与业务 {@code code} 解耦（rainbond-console 祖传约定）：
+ * <p>HTTP 状态码与业务 {@code code} 对齐 rainbond-console（Django/DRF）行为：
  * <ul>
- *   <li>除 401/403 由 Spring Security 的 EntryPoint/Handler 写出对应 HTTP 状态码外，其他异常一律 HTTP 200</li>
- *   <li>业务码走响应体 {@code code} 字段（如 400、404、500）</li>
+ *   <li>业务异常的 HTTP 状态码 = 业务 code（如 ServiceHandleException(404,...) → HTTP 404）</li>
+ *   <li>Region 异常优先用其 {@code httpStatus}，缺失时退回 {@code code} 或 500</li>
+ *   <li>响应 body 仍是 {@code general_message} 形状：{@code {code, msg, msg_show, data}}</li>
  * </ul>
+ *
+ * <p>这样前端 axios 默认按 HTTP 状态码进 catch 路径，不需为 kuship 额外改造 request.js，
+ * 与 rainbond-ui 共享同一份请求 utility。
  *
  * <p>兜底分支会把 MDC 中的 traceId 写入 {@code data.bean.trace_id}，方便用户复制后报障。
  */
@@ -49,12 +55,13 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ServiceHandleException.class)
-    public ApiResult onServiceHandle(ServiceHandleException ex) {
-        return GeneralMessage.error(ex.getCode(), ex.getMsg(), ex.getMsgShow());
+    public ResponseEntity<ApiResult> onServiceHandle(ServiceHandleException ex) {
+        ApiResult body = GeneralMessage.error(ex.getCode(), ex.getMsg(), ex.getMsgShow());
+        return ResponseEntity.status(toHttpStatus(ex.getCode(), 0)).body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ApiResult onValidation(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ApiResult> onValidation(MethodArgumentNotValidException ex) {
         List<Map<String, Object>> errors = new ArrayList<>();
         ex.getBindingResult().getFieldErrors().forEach(fe -> {
             Map<String, Object> err = new LinkedHashMap<>();
@@ -64,12 +71,12 @@ public class GlobalExceptionHandler {
         });
         Map<String, Object> bean = new LinkedHashMap<>();
         bean.put("errors", errors);
-        return new ApiResult(400, summarize(errors), "参数校验失败",
-                wrapData(bean));
+        ApiResult body = new ApiResult(400, summarize(errors), "参数校验失败", wrapData(bean));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ApiResult onConstraintViolation(ConstraintViolationException ex) {
+    public ResponseEntity<ApiResult> onConstraintViolation(ConstraintViolationException ex) {
         List<Map<String, Object>> errors = new ArrayList<>();
         for (ConstraintViolation<?> v : ex.getConstraintViolations()) {
             Map<String, Object> err = new LinkedHashMap<>();
@@ -79,43 +86,46 @@ public class GlobalExceptionHandler {
         }
         Map<String, Object> bean = new LinkedHashMap<>();
         bean.put("errors", errors);
-        return new ApiResult(400, summarize(errors), "参数校验失败",
-                wrapData(bean));
+        ApiResult body = new ApiResult(400, summarize(errors), "参数校验失败", wrapData(bean));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ApiResult onUnreadableBody(HttpMessageNotReadableException ex) {
-        return GeneralMessage.error(400, ex.getMostSpecificCause().getMessage(), "请求体解析失败");
+    public ResponseEntity<ApiResult> onUnreadableBody(HttpMessageNotReadableException ex) {
+        ApiResult body = GeneralMessage.error(400, ex.getMostSpecificCause().getMessage(), "请求体解析失败");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler({MissingRequestHeaderException.class, MethodArgumentTypeMismatchException.class})
-    public ApiResult onBadRequest(Exception ex) {
-        return GeneralMessage.error(400, ex.getMessage(), "请求参数不正确");
+    public ResponseEntity<ApiResult> onBadRequest(Exception ex) {
+        ApiResult body = GeneralMessage.error(400, ex.getMessage(), "请求参数不正确");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ApiResult onIllegalArgument(IllegalArgumentException ex) {
+    public ResponseEntity<ApiResult> onIllegalArgument(IllegalArgumentException ex) {
         // 来自 PageRequestAdapter 等工具类的参数校验
-        return GeneralMessage.error(400, ex.getMessage(), "参数校验失败");
+        ApiResult body = GeneralMessage.error(400, ex.getMessage(), "参数校验失败");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     // ---- Region API exception family（migrate-console-region-client 追加） ----
 
     @ExceptionHandler(RegionApiFrequentException.class)
-    public ApiResult onRegionFrequent(RegionApiFrequentException ex) {
-        return GeneralMessage.error(ex.getCode(), ex.getMsg(), ex.getMsgShow());
+    public ResponseEntity<ApiResult> onRegionFrequent(RegionApiFrequentException ex) {
+        return regionResponse(ex);
     }
 
     @ExceptionHandler(RegionApiSocketException.class)
-    public ApiResult onRegionSocket(RegionApiSocketException ex) {
+    public ResponseEntity<ApiResult> onRegionSocket(RegionApiSocketException ex) {
         log.warn("region api socket error: api={} url={} method={} : {}",
                 ex.getApiType(), ex.getUrl(), ex.getMethod(), ex.getMessage());
-        return GeneralMessage.error(ex.getCode(), ex.getMsg(), ex.getMsgShow());
+        return regionResponse(ex);
     }
 
     @ExceptionHandler(InvalidLicenseException.class)
-    public ApiResult onInvalidLicense(InvalidLicenseException ex) {
-        return GeneralMessage.error(ex.getCode(), ex.getMsg(), ex.getMsgShow());
+    public ResponseEntity<ApiResult> onInvalidLicense(InvalidLicenseException ex) {
+        return regionResponse(ex);
     }
 
     @ExceptionHandler({
@@ -129,25 +139,55 @@ public class GlobalExceptionHandler {
             ClusterAuthLackOfLicenseException.class,
             ClusterAuthLackOfLicenseExpireException.class
     })
-    public ApiResult onResourceShortage(RegionApiException ex) {
-        return GeneralMessage.error(ex.getCode(), ex.getMsg(), ex.getMsgShow());
+    public ResponseEntity<ApiResult> onResourceShortage(RegionApiException ex) {
+        return regionResponse(ex);
     }
 
     /** 通用 region 异常 —— 必须放在所有专门 region 异常 handler 之后。 */
     @ExceptionHandler(RegionApiException.class)
-    public ApiResult onRegionApi(RegionApiException ex) {
-        return GeneralMessage.error(ex.getCode(), ex.getMsg(), ex.getMsgShow());
+    public ResponseEntity<ApiResult> onRegionApi(RegionApiException ex) {
+        return regionResponse(ex);
     }
 
     @ExceptionHandler(Exception.class)
-    public ApiResult onUncaught(Exception ex) {
+    public ResponseEntity<ApiResult> onUncaught(Exception ex) {
         String traceId = MDC.get("traceId");
         log.error("uncaught exception traceId={} : {}", traceId, ex.getMessage(), ex);
         Map<String, Object> bean = new LinkedHashMap<>();
         if (traceId != null) {
             bean.put("trace_id", traceId);
         }
-        return new ApiResult(500, ex.getMessage(), "系统异常", wrapData(bean));
+        ApiResult body = new ApiResult(500, ex.getMessage(), "系统异常", wrapData(bean));
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+
+    /**
+     * Region 异常优先用 {@code httpStatus}（来自上游 region API 真实响应），
+     * 缺失（socket 错误等场景为 0）时退回 {@code code}，再退回 500。
+     */
+    private static ResponseEntity<ApiResult> regionResponse(RegionApiException ex) {
+        ApiResult body = GeneralMessage.error(ex.getCode(), ex.getMsg(), ex.getMsgShow());
+        return ResponseEntity.status(toHttpStatus(ex.getCode(), ex.getHttpStatus())).body(body);
+    }
+
+    /**
+     * 把业务码映射成合法 HTTP 状态码：
+     * <ul>
+     *   <li>{@code httpStatus} 在 [400, 599] 内：直接使用</li>
+     *   <li>否则若 {@code code} 在 [400, 599] 内：使用 code（ServiceHandleException 的常见情况）</li>
+     *   <li>否则（业务子码如 10400 / 20800）：退回 500</li>
+     * </ul>
+     */
+    private static HttpStatus toHttpStatus(int code, int httpStatus) {
+        if (httpStatus >= 400 && httpStatus <= 599) {
+            HttpStatus s = HttpStatus.resolve(httpStatus);
+            if (s != null) return s;
+        }
+        if (code >= 400 && code <= 599) {
+            HttpStatus s = HttpStatus.resolve(code);
+            if (s != null) return s;
+        }
+        return HttpStatus.INTERNAL_SERVER_ERROR;
     }
 
     private static String summarize(List<Map<String, Object>> errors) {

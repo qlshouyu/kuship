@@ -109,7 +109,7 @@ class GroupLifecycleIntegrationTest {
                         .header("Authorization", "GRJWT " + token())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"governance_mode\":\"BAD_VALUE\"}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
 
         // 5. 详情

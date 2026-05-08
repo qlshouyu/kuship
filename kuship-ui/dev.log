@@ -1,0 +1,16 @@
+yarn run v1.22.22
+$ cross-env NODE_OPTIONS=--openssl-legacy-provider umi dev
+Bundle with webpack 5...
+⏱️  MFSU Enabled
+Mako https://makojs.dev is a new fast Rust based bundler from us, which is heavily optimized for umi and much faster than webpack. Visit https://makojs.dev/docs/getting-started#bundle-with-umi for more details if you want to give it a try.
+Starting the development server...
+ℹ Compiling Webpack
+✔ Webpack: Compiled successfully in 1.95s
+ DONE  Compiled successfully in 1954ms10:05:52 AM
+
+
+  App running at:
+  - Local:   http://localhost:8000 (copied to clipboard)
+  - Network: http://10.1.204.217:8000
+(node:7937) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)

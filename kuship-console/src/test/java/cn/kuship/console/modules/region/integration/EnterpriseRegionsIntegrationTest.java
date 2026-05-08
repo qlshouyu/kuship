@@ -127,7 +127,7 @@ class EnterpriseRegionsIntegrationTest {
         // 5. 删除后再 GET 应 404
         mvc.perform(get("/console/enterprise/" + ENTERPRISE + "/regions/" + regionId)
                         .header("Authorization", "GRJWT " + adminToken()))
-                .andExpect(status().isOk())
+                .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(404));
     }
 
@@ -138,7 +138,7 @@ class EnterpriseRegionsIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"region_name\":\"bad-r\",\"region_alias\":\"x\","
                                 + "\"region_type\":[],\"token\":\"ca.pem: only\"}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg_show").value("客户端密钥不存在"));
     }

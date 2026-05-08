@@ -98,7 +98,7 @@ class EnterpriseAdminIntegrationTest {
                         .content("{\"user_name\":\"would-fail\","
                                 + "\"email\":\"would-fail@kuship.local\","
                                 + "\"password\":\"failpwd12345\"}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value(403))
                 .andExpect(jsonPath("$.msg_show").value("您无操作此功能的权限"));
     }

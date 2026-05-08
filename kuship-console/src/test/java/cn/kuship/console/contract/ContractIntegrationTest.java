@@ -160,8 +160,9 @@ class ContractIntegrationTest {
 
     @Test
     void serviceHandleException_passesCodeMsgMsgShow() throws Exception {
+        // HTTP 状态码 = 业务 code（与 rainbond-console DRF 行为对齐，让 axios 进入 catch 路径）
         mvc.perform(get("/console/_contract/throw-service").header("Authorization", "GRJWT " + validToken()))
-                .andExpect(status().isOk())
+                .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(404))
                 .andExpect(jsonPath("$.msg").value("team not found"))
                 .andExpect(jsonPath("$.msg_show").value("团队不存在"));
@@ -170,7 +171,7 @@ class ContractIntegrationTest {
     @Test
     void runtimeException_fallback_500_withTraceId() throws Exception {
         mvc.perform(get("/console/_contract/throw-runtime").header("Authorization", "GRJWT " + validToken()))
-                .andExpect(status().isOk())
+                .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value(500))
                 .andExpect(jsonPath("$.msg_show").value("系统异常"))
                 .andExpect(jsonPath("$.data.bean.trace_id").exists())
@@ -183,7 +184,7 @@ class ContractIntegrationTest {
                         .header("Authorization", "GRJWT " + validToken())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"\",\"age\":0}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg_show").value("参数校验失败"))
                 .andExpect(jsonPath("$.data.bean.errors").isArray());
@@ -195,7 +196,7 @@ class ContractIntegrationTest {
                         .header("Authorization", "GRJWT " + validToken())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("not json"))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg_show").value("请求体解析失败"));
     }
@@ -204,7 +205,7 @@ class ContractIntegrationTest {
     void illegalArgument_returns400() throws Exception {
         mvc.perform(get("/console/_contract/page?page=0")
                         .header("Authorization", "GRJWT " + validToken()))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg_show").value("参数校验失败"));
     }

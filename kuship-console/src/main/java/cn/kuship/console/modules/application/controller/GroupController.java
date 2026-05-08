@@ -120,7 +120,12 @@ public class GroupController {
 
     private Map<String, Object> serialize(ServiceGroup g) {
         Map<String, Object> m = new LinkedHashMap<>();
+        // app_id / group_id 同值兼容：rainbond-ui 历史在 addGroup callback 里读 group_id
+        // (CreateComponentModal::handleMarketAppSubmit 用 res.group_id 决定是否调 installApp)，
+        // 而其它入口/列表项又读 app_id。两个字段都返同一个 PK 值。
         m.put("app_id", g.getId());
+        m.put("group_id", g.getId());
+        m.put("ID", g.getId());
         m.put("group_name", g.getGroupName());
         m.put("note", g.getNote());
         m.put("region_name", g.getRegionName());

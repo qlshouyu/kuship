@@ -37,6 +37,11 @@ public class RegionPluginController {
 
     @GetMapping(value = {"/officialplugins", "/officialplugins/"})
     public ApiResult listOfficialPlugins(@PathVariable("region_name") String regionName) {
-        return GeneralMessage.ok(rbdPluginOps.listOfficialPlugins(regionName));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> wrapped = rbdPluginOps.listOfficialPlugins(regionName);
+        java.util.List<?> list = wrapped.get("list") instanceof java.util.List<?> l ? l : java.util.List.of();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> bean = wrapped.get("bean") instanceof Map ? (Map<String, Object>) wrapped.get("bean") : Map.of();
+        return GeneralMessage.okWithExtras(bean, list, null);
     }
 }

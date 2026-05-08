@@ -111,7 +111,7 @@ class PermAspectIntegrationTest {
     void normalUser_withoutPerm_returns403() throws Exception {
         mvc.perform(get("/console/teams/" + TEAM + "/roles")
                         .header("Authorization", "GRJWT " + tokenFor(NO_PERM_ID, "kuship-perm-noperm")))
-                .andExpect(status().isOk())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value(403))
                 .andExpect(jsonPath("$.msg_show").value("您无操作此功能的权限"));
     }

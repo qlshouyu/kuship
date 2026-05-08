@@ -1,7 +1,7 @@
 # kuship项目
-kuship是一个基于rainbond的kubernetes的云原生服务托管管理项目，主要是rainbond-console使用java springboot技术栈进行实现
+kuship是一个基于rainbond的kubernetes的云原生服务托管管理项目，kuship-console主要是rainbond-console使用java springboot技术栈进行实现，kuship-ui新的控制台前端，直接拷贝rainbond-ui，调用kuship-console
 
-# 目录结构
+## 目录结构
 ```
 kuship/
 ├── CLAUDE.md                    # 项目说明（供 Claude Code 使用）
@@ -52,3 +52,5 @@ kuship/
     └── skills/                  # 项目级技能
 
 ```
+## 其它
+- 老项目rainbond管理控制台启动地址http://localhost:7070/，新项目kuship的管理控制台启动地址http://localhost:8000/,解决kuship问题时可以参考老项目rainbond

@@ -13,6 +13,8 @@ public interface ServiceGroupRelationRepository extends JpaRepository<ServiceGro
 
     List<ServiceGroupRelation> findByGroupId(Integer groupId);
 
+    List<ServiceGroupRelation> findByGroupIdIn(List<Integer> groupIds);
+
     Optional<ServiceGroupRelation> findByServiceId(String serviceId);
 
     @Modifying

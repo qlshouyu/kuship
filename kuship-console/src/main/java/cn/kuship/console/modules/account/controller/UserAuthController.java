@@ -12,9 +12,11 @@ import cn.kuship.console.modules.account.entity.UserInfo;
 import cn.kuship.console.modules.account.jwt.JwtIssuer;
 import cn.kuship.console.modules.account.service.UserService;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
@@ -37,7 +39,21 @@ public class UserAuthController {
 
     @PostMapping(value = {"/login", "/login/"})
     public ApiResult login(@RequestBody @Valid LoginReq req) {
-        UserInfo user = userService.authenticate(req.nickName(), req.password());
+        return doLogin(req.nickName(), req.password());
+    }
+
+    /**
+     * 兼容 rainbond-ui 历史发送格式 {@code application/x-www-form-urlencoded}。
+     * rainbond-console (DRF) 默认接受 form 与 JSON 两种 Content-Type；kuship-console 需对齐契约。
+     */
+    @PostMapping(value = {"/login", "/login/"}, consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public ApiResult loginForm(@RequestParam("nick_name") String nickName,
+                               @RequestParam("password") String password) {
+        return doLogin(nickName, password);
+    }
+
+    private ApiResult doLogin(String nickName, String password) {
+        UserInfo user = userService.authenticate(nickName, password);
         String token = jwtIssuer.issue(user);
         Map<String, Object> bean = new LinkedHashMap<>();
         bean.put("token", token);

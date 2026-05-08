@@ -132,7 +132,7 @@ class AppAutoscalerIntegrationTest {
                         .header("Authorization", "GRJWT " + token())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"min_replicas\":1,\"max_replicas\":5,\"xpa_type\":\"hpa\",\"metrics\":[]}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg_show").value("metrics 不能为空"));
     }

@@ -11,11 +11,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.function.Function;
 
 /** application 模块下 Operations Impl 共享的 region 调用 helper（沿用 TenantOperationsImpl 模式）。 */
-final class RegionApiSupport {
+public final class RegionApiSupport {
 
     private RegionApiSupport() {}
 
-    static ResponseEntity<String> exchange(RegionClientFactory factory, String regionName, String enterpriseId,
+    public static ResponseEntity<String> exchange(RegionClientFactory factory, String regionName, String enterpriseId,
                                               String apiType, String url, String httpMethod,
                                               Function<RestClient, ResponseEntity<String>> caller) {
         RegionClient regionClient = factory.getClient(regionName, enterpriseId);
@@ -30,7 +30,7 @@ final class RegionApiSupport {
         }
     }
 
-    static ResponseEntity<String> readAsString(org.springframework.http.client.ClientHttpResponse resp) {
+    public static ResponseEntity<String> readAsString(org.springframework.http.client.ClientHttpResponse resp) {
         try {
             return ResponseEntity.status(resp.getStatusCode())
                     .headers(resp.getHeaders())

@@ -7,7 +7,7 @@ if (process.env.SEPARATION === 'true') {
   publcPath = `/`;
 }
 const isHistory = process.env.ROUTE_MODE === 'history';
-const proxyTarget = process.env.CONSOLE_PROXY_TARGET || 'http://localhost:7070';
+const proxyTarget = process.env.CONSOLE_PROXY_TARGET || 'http://localhost:8080';
 
 export default {
   history: { type: isHistory ? 'browser' : 'hash' },

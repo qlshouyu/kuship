@@ -93,7 +93,7 @@ class AccountAuthIntegrationTest {
         mvc.perform(post("/console/users/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nick_name\":\"" + TEST_NICK + "\",\"password\":\"wrongpasswd\"}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg_show").value("用户名或密码错误"));
     }

@@ -101,7 +101,7 @@ class AppEnvIntegrationTest {
                         .header("Authorization", "GRJWT " + token())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"attr_name\":\"DB_HOST\",\"attr_value\":\"x\",\"scope\":\"inner\"}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg_show").value("环境变量名已存在"));
 

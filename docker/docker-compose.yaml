@@ -6,6 +6,10 @@
 #   - 首次启动前，请先在仓库根目录执行 `./standalone_build.sh`，确保
 #     `k3s-images-<arch>.tar.zst` 离线镜像包已就位（compose 自带的 `build`
 #     段不会调用 `standalone/images-package.sh` 准备该离线包）。
+#   - 可选加速：执行 `./standalone_build.sh build_business_images=1` 生成
+#     `rainbond-images-<arch>.tar.zst`，rainbond 服务会自动挂载到容器内
+#     由 k3s 启动时 import；缺失该文件时退化为在线拉取，启动不会失败。
+#   - 通过 `ARCH=amd64`（缺省 arm64）切换离线包架构后缀，需与构建机平台一致。
 #   - 启动方式：`docker compose -f docker/docker-compose.yaml up -d`
 
 services:
@@ -70,8 +74,10 @@ services:
       - "80:80"
       - "443:443"
       - "6443:6443"
+      - "8443:18443"  # 主机 8443 → 容器 18443（kubectl port-forward 转发 svc/rbd-api-api:8443）；容器内 8443 留给 apisix(hostNetwork)
     volumes:
       - rainbond-data:/opt/rainbond
+      - ../rainbond-images-${ARCH:-arm64}.tar.zst:/tmp/rainbond-images.tar.zst:ro
 
 networks:
   default:

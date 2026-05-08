@@ -3,10 +3,11 @@
 # kuship standalone 构建编排入口。
 #
 # 用法：
-#   ./standalone_build.sh                        # 默认行为：照常拉/复用离线包并构建镜像
-#   ./standalone_build.sh enable_proxy=1         # 为 curl/docker 等本进程命令导出 http://127.0.0.1:7897 代理
-#   ./standalone_build.sh force_rebuild=1        # 即使 k3s-images-<arch>.tar.zst 已存在也强制重新生成
-#   ./standalone_build.sh -h | --help            # 打印用法
+#   ./standalone_build.sh                          # 默认行为：照常拉/复用离线包并构建镜像
+#   ./standalone_build.sh enable_proxy=1           # 为 curl/docker 等本进程命令导出 http://127.0.0.1:7897 代理
+#   ./standalone_build.sh force_rebuild=1          # 即使 k3s-images-<arch>.tar.zst 已存在也强制重新生成
+#   ./standalone_build.sh build_business_images=1  # 同时生成 rainbond-images-<arch>.tar.zst（业务镜像离线包）
+#   ./standalone_build.sh -h | --help              # 打印用法
 #
 # 注意：enable_proxy 仅影响本脚本进程内的命令；docker daemon 拉取基础镜像
 # (alpine/helm:3、ubuntu:24.04 等) 是否走代理由 Docker Desktop / dockerd 自身配置决定。
@@ -18,6 +19,7 @@ cd "${SCRIPT_DIR}"
 
 ENABLE_PROXY=0
 FORCE_REBUILD=0
+BUILD_BUSINESS_IMAGES=0
 # 本进程内（curl 取 k3s-images.txt、本机 docker pull）走 127.0.0.1
 PROXY_URL="http://127.0.0.1:7897"
 # buildx 容器内访问宿主机代理需用 host.docker.internal（macOS Docker Desktop 自动解析为宿主机 IP）
@@ -25,11 +27,16 @@ BUILD_PROXY_URL="http://host.docker.internal:7897"
 
 usage() {
     cat <<EOF
-Usage: ./standalone_build.sh [enable_proxy=0|1] [force_rebuild=0|1]
+Usage: ./standalone_build.sh [enable_proxy=0|1] [force_rebuild=0|1] [build_business_images=0|1]
 
-  enable_proxy=1   set ${PROXY_URL} as proxy for curl/docker in this process (default 0)
-  force_rebuild=1  re-run images-package.sh even if k3s-images-<arch>.tar.zst exists (default 0)
-  -h, --help       show this help and exit
+  enable_proxy=1           set ${PROXY_URL} as proxy for curl/docker in this process (default 0)
+  force_rebuild=1          re-run images-package.sh even if k3s-images-<arch>.tar.zst exists; also forces
+                           regeneration of rainbond-images-<arch>.tar.zst when build_business_images=1
+                           (default 0)
+  build_business_images=1  invoke standalone/business-images-package.sh to generate
+                           rainbond-images-<arch>.tar.zst (rainbond business image bundle); skipped when
+                           rainbond-images-<arch>.tar.zst already exists unless force_rebuild=1 (default 0)
+  -h, --help               show this help and exit
 EOF
 }
 
@@ -45,9 +52,10 @@ is_truthy() {
 ########################################
 for arg in "$@"; do
     case "$arg" in
-        enable_proxy=*)  ENABLE_PROXY="${arg#*=}" ;;
-        force_rebuild=*) FORCE_REBUILD="${arg#*=}" ;;
-        -h|--help)       usage; exit 0 ;;
+        enable_proxy=*)          ENABLE_PROXY="${arg#*=}" ;;
+        force_rebuild=*)         FORCE_REBUILD="${arg#*=}" ;;
+        build_business_images=*) BUILD_BUSINESS_IMAGES="${arg#*=}" ;;
+        -h|--help)               usage; exit 0 ;;
         *)
             echo "ERROR: unknown argument: $arg" >&2
             usage >&2
@@ -108,6 +116,20 @@ else
 fi
 
 ########################################
+# 5b. 复用 / 重建 rainbond 业务镜像离线包（可选）
+########################################
+if is_truthy "${BUILD_BUSINESS_IMAGES}"; then
+    BUSINESS_CACHE_FILE="${SCRIPT_DIR}/rainbond-images-${ARCH_TAG}.tar.zst"
+    if [ -f "${BUSINESS_CACHE_FILE}" ] && ! is_truthy "${FORCE_REBUILD}"; then
+        echo "==> 检测到 ${BUSINESS_CACHE_FILE}，跳过 ./standalone/business-images-package.sh"
+        echo "    （如已升级 standalone/rainbond-images.env，请加 force_rebuild=1 强制刷新离线包）"
+    else
+        echo "==> 生成 rainbond 业务镜像离线包 ${BUSINESS_CACHE_FILE}"
+        ./standalone/business-images-package.sh
+    fi
+fi
+
+########################################
 # 6. 构建镜像
 ########################################
 BUILD_PROXY_ARGS=()
@@ -126,6 +148,6 @@ echo "==> docker buildx build (K3S_VERSION=${K3S_VERSION}, ARCH=${ARCH}${ENABLE_
 docker buildx build \
     -f standalone/Dockerfile \
     --build-arg "K3S_VERSION=${K3S_VERSION}" \
-    "${BUILD_PROXY_ARGS[@]}" \
+    ${BUILD_PROXY_ARGS[@]+"${BUILD_PROXY_ARGS[@]}"} \
     -t rainbond-dev:v6.7.1-release \
     .

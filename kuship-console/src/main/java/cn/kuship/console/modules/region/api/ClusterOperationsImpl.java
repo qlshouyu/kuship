@@ -76,13 +76,27 @@ public class ClusterOperationsImpl implements ClusterOperations {
 
     @Override
     public RegionFeaturesResp getRegionFeatures(String regionName, String tenantName) {
-        // tenantName 仅用于 enterpriseId 上下文（rainbond region API 不强制）
-        String url = "/v2/cluster/features";
+        // path 对齐 rainbond Python：regionapi.py:2431 url + "/license/features"
+        // 响应 shape：rbd-api 返回顶层 list（rainbond services region_services.py:182 body["list"]），
+        // 不是 data.bean，所以这里手动解析顶层 list 而非 extractBean。
+        String url = "/license/features";
         ResponseEntity<String> resp = exchange(regionName, "", "GET", url,
                 c -> c.get().uri(url).exchange((req2, resp2) -> ResponseEntity.status(resp2.getStatusCode())
                                 .headers(resp2.getHeaders())
                                 .body(new String(resp2.getBody().readAllBytes(), StandardCharsets.UTF_8))));
-        return processor.extractBean(resp, RegionFeaturesResp.class, API_TYPE, url, "GET");
+        tools.jackson.databind.JsonNode body = processor.checkStatus(resp, API_TYPE, url, "GET");
+        tools.jackson.databind.JsonNode listNode = body.path("list");
+        if (listNode.isMissingNode() || listNode.isNull() || !listNode.isArray()) {
+            // 兜底兼容 data.list 形态
+            listNode = body.path("data").path("list");
+        }
+        List<String> features = new java.util.ArrayList<>();
+        if (listNode.isArray()) {
+            for (tools.jackson.databind.JsonNode n : listNode) {
+                features.add(n.asText());
+            }
+        }
+        return new RegionFeaturesResp(features, null, Map.of());
     }
 
     @Override

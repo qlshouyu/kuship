@@ -60,6 +60,9 @@ public class SecurityConfig {
                                     "/console/healthz",
                                     "/console/healthz/",
                                     "/console/oauth/**",
+                                    // /app-server/** 反代外部应用市场（hub.grapps.cn），与 rainbond 一致公开匿名；
+                                    // controller 透传 method/path/headers/body，登录前后均可使用。
+                                    "/app-server/**",
                                     "/openapi/**",
                                     // add-mcp-sse — MCP endpoints authenticate via PAT (Bearer header
                                     // or ?access_token= for SSE EventSource compat) inside McpAuthFilter,
@@ -95,7 +98,11 @@ public class SecurityConfig {
                                     "/console/custom/deploy/*", "/console/custom/deploy/*/")
                             .permitAll()
                             .requestMatchers(HttpMethod.GET, "/console/enterprise/info", "/console/enterprise/info/",
-                                    "/console/perms", "/console/perms/").permitAll();
+                                    "/console/perms", "/console/perms/",
+                                    // migrate-console-platform-config — 站点元数据匿名公开
+                                    "/console/config/info", "/console/config/info/").permitAll()
+                            // 全局自定义配置：对齐 rainbond CustomConfigsCLView (BaseApiView, 无需 JWT)
+                            .requestMatchers("/console/custom_configs", "/console/custom_configs/").permitAll();
                     if (allowPublicInit) {
                         auth.requestMatchers(HttpMethod.POST, "/console/init/perms", "/console/init/perms/").permitAll();
                     }

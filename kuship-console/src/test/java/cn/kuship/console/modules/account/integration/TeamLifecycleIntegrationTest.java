@@ -102,7 +102,7 @@ class TeamLifecycleIntegrationTest {
         // 3. 唯一 owner 不能退出
         mvc.perform(post("/console/teams/" + TEST_TEAM + "/exit")
                         .header("Authorization", "GRJWT " + ownerToken))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.msg_show").value("团队仅剩一位 owner，无法退出"));
 

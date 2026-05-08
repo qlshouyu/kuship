@@ -99,7 +99,7 @@ cn.kuship.console
 | `IllegalArgumentException` | 400 | 参数校验失败 |
 | 兜底 `Exception` | 500 | 系统异常（响应体含 `data.bean.trace_id`） |
 
-HTTP 状态码与业务 `code` **解耦**（rainbond-console 祖传约定）：除 401/403 外一律 HTTP 200，业务码走响应体 `code` 字段。
+HTTP 状态码与业务 `code` **对齐**（与 rainbond-console DRF 行为一致，`align-error-http-status` change 起）：业务异常 HTTP 状态码 = 业务 `code`（如 `ServiceHandleException(404,...)` → HTTP 404）；Region 异常优先用其 `httpStatus`，缺失退回 `code` 或 500；body 仍是 `general_message` 形状（`{code, msg, msg_show, data}`）。这样 kuship-ui 直接复用 rainbond-ui 的 `request.js`（按 HTTP 状态进入 axios catch + 全局 toast），无需为 kuship 单独改造前端。
 
 ### JWT 认证（兼容 djangorestframework-jwt 1.11.0）
 

@@ -26,16 +26,46 @@ public class RainbondPluginOperationsImpl implements RainbondPluginOperations {
 
     private final RegionClientFactory clientFactory;
     private final RegionApiResponseProcessor processor;
+    private final tools.jackson.databind.ObjectMapper objectMapper;
 
-    public RainbondPluginOperationsImpl(RegionClientFactory clientFactory, RegionApiResponseProcessor processor) {
+    public RainbondPluginOperationsImpl(RegionClientFactory clientFactory,
+                                          RegionApiResponseProcessor processor,
+                                          tools.jackson.databind.ObjectMapper objectMapper) {
         this.clientFactory = clientFactory;
         this.processor = processor;
+        this.objectMapper = objectMapper;
     }
 
-    @Override public Map<String, Object> listPlugins(String regionName) { return getJson(regionName, "/v2/rbd-plugins"); }
+    @Override public Map<String, Object> listPlugins(String regionName) { return listClusterPlugins(regionName, false); }
     @Override public Map<String, Object> listPlatformPlugins(String regionName) { return getJson(regionName, "/v2/rbd-platform-plugins"); }
-    @Override public Map<String, Object> listOfficialPlugins(String regionName) { return getJson(regionName, "/v2/rbd-official-plugins"); }
+    @Override public Map<String, Object> listOfficialPlugins(String regionName) { return listClusterPlugins(regionName, true); }
     @Override public Map<String, Object> listObservablePlugins(String regionName) { return getJson(regionName, "/v2/rbd-observable-plugins"); }
+
+    /**
+     * 对齐 rainbond Python {@code regionapi.py:2755 url + "/v2/cluster/plugins?official={0}"}：
+     * region API 返回顶层 {@code {code, msg, list:[...]}}（不是 data.bean）。
+     */
+    private Map<String, Object> listClusterPlugins(String regionName, boolean official) {
+        String url = "/v2/cluster/plugins?official=" + official;
+        ResponseEntity<String> resp = RegionApiSupport.exchange(clientFactory, regionName, "", API_TYPE, url, "GET",
+                c -> c.get().uri(url).exchange((req, r) -> RegionApiSupport.readAsString(r)));
+        tools.jackson.databind.JsonNode body = processor.checkStatus(resp, API_TYPE, url, "GET");
+        tools.jackson.databind.JsonNode listNode = body.path("list");
+        if (listNode.isMissingNode() || listNode.isNull() || !listNode.isArray()) {
+            listNode = body.path("data").path("list");
+        }
+        java.util.List<Object> plugins = new java.util.ArrayList<>();
+        if (listNode.isArray()) {
+            for (tools.jackson.databind.JsonNode n : listNode) {
+                plugins.add(objectMapper.convertValue(n, Object.class));
+            }
+        }
+        // bean.need_authz 占位 false（rainbond 端 need_authz 来自 platform plugin market 校验，本 change 不接公网市场）
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("list", plugins);
+        result.put("bean", Map.of("need_authz", false));
+        return result;
+    }
 
     @Override
     public Map<String, Object> installPlatformPlugin(String regionName, String pluginId, Map<String, Object> body) {
