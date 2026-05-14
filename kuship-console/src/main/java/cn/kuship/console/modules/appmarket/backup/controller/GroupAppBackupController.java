@@ -99,8 +99,7 @@ public class GroupAppBackupController {
                                 @RequestParam("backup_id") String backupId) {
         ServiceGroupBackup b = backupRepo.findByBackupId(backupId)
                 .orElseThrow(() -> new ServiceHandleException(404, "backup not found", "备份不存在"));
-        Map<String, Object> resp = backupOps.export(b.getRegion(), teamName, backupId);
-        return GeneralMessage.ok(resp == null ? Map.of() : resp);
+        return GeneralMessage.ok(toBean(b));
     }
 
     @PostMapping(value = {"/console/teams/{team_name}/groupapp/{group_id}/backup/import",
@@ -110,7 +109,7 @@ public class GroupAppBackupController {
                                        @RequestBody(required = false) Map<String, Object> body) {
         ServiceGroup group = groupRepo.findById(groupId)
                 .orElseThrow(() -> new ServiceHandleException(404, "group not found", "应用不存在"));
-        Map<String, Object> resp = backupOps.restore(group.getRegionName(), teamName,
+        Map<String, Object> resp = backupOps.copyBackupData(group.getRegionName(), teamName,
                 body != null ? body : Map.of());
         return GeneralMessage.ok(resp == null ? Map.of() : resp);
     }

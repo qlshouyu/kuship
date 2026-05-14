@@ -198,4 +198,5 @@ patch_coredns_upstream() {
 
 patch_coredns_upstream &
 
+
 exec "$@"

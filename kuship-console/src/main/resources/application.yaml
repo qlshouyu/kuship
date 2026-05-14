@@ -40,7 +40,9 @@ spring:
     properties:
       hibernate:
         jdbc:
-          time_zone: UTC
+          # rainbond Django 以 Asia/Shanghai 写 datetime 列（USE_TZ=False，TIME_ZONE=Asia/Shanghai），
+          # 这里保持一致：LocalDateTime 读写都按 Asia/Shanghai，避免响应里的时间多/少 8 小时。
+          time_zone: Asia/Shanghai
         format_sql: false
         # GraalVM Native 兼容性：关闭 ByteBuddy 字节码增强（运行时类生成 ≠ native image）。
         # 代价是 ~5% 性能损失（lazy load 退化为 eager load）；本项目所有关联手动 join，影响为零。

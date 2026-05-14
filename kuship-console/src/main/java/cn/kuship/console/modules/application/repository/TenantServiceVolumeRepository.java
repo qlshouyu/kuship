@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface TenantServiceVolumeRepository extends JpaRepository<TenantServiceVolume, Integer> {
     List<TenantServiceVolume> findByServiceId(String serviceId);
+
+    List<TenantServiceVolume> findByServiceIdIn(List<String> serviceIds);
 }

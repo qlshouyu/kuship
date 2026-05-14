@@ -11,6 +11,7 @@ import cn.kuship.console.modules.application.entity.TenantService;
 import cn.kuship.console.modules.application.entity.TenantServiceRelation;
 import cn.kuship.console.modules.application.repository.TenantServiceRelationRepository;
 import cn.kuship.console.modules.application.repository.TenantServiceRepository;
+import cn.kuship.console.modules.application.service.AppDependencyBatchService;
 import jakarta.validation.Valid;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -27,13 +28,32 @@ public class AppDependencyController {
     private final TenantServiceRelationRepository relationRepo;
     private final TenantServiceRepository serviceRepo;
     private final ServiceDependencyOperations dependencyOperations;
+    private final AppDependencyBatchService batchService;
 
     public AppDependencyController(TenantServiceRelationRepository relationRepo,
                                      TenantServiceRepository serviceRepo,
-                                     ServiceDependencyOperations dependencyOperations) {
+                                     ServiceDependencyOperations dependencyOperations,
+                                     AppDependencyBatchService batchService) {
         this.relationRepo = relationRepo;
         this.serviceRepo = serviceRepo;
         this.dependencyOperations = dependencyOperations;
+        this.batchService = batchService;
+    }
+
+    /**
+     * 批量添加依赖 —— rainbond 锚点：{@code urls.py:614} {@code AppDependencyViewList POST}。
+     *
+     * <p>路径：{@code POST /console/teams/{team_name}/apps/{service_alias}/dependency-list}
+     *
+     * <p>body 格式：{@code {"dep_service_ids": ["id1", "id2", ...]}}
+     */
+    @PostMapping(value = {"/dependency-list", "/dependency-list/"})
+    @RequirePerm(PermCode.APP_CREATE_PERMS)
+    public ApiResult addBatch(@PathVariable("team_name") String teamName,
+                              @PathVariable("service_alias") String serviceAlias,
+                              @RequestBody Map<String, Object> body) {
+        Map<String, Object> result = batchService.addBatch(teamName, serviceAlias, body);
+        return GeneralMessage.ok(result);
     }
 
     @GetMapping(value = {"/dependency-list", "/dependency-list/"})

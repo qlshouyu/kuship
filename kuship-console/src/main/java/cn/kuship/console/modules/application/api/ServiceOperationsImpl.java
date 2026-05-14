@@ -97,6 +97,94 @@ public class ServiceOperationsImpl implements ServiceOperations {
         return safeBean(processor.extractBean(resp, Map.class, API_TYPE, url, "GET"));
     }
 
+    // ─── migrate-console-build-versions：9 个新 method ────────────────────────
+
+    @Override
+    public Map<String, Object> getBuildVersions(String regionName, String tenantName, String serviceAlias) {
+        String url = "/v2/tenants/" + encode(tenantName) + "/services/" + encode(serviceAlias) + "/build-list";
+        ResponseEntity<String> resp = RegionApiSupport.exchange(clientFactory, regionName, "", API_TYPE, url, "GET",
+                c -> c.get().uri(url).exchange((req, r) -> RegionApiSupport.readAsString(r)));
+        return safeBean(processor.extractBean(resp, Map.class, API_TYPE, url, "GET"));
+    }
+
+    @Override
+    public Map<String, Object> getBuildVersionById(String regionName, String tenantName, String serviceAlias, String versionId) {
+        String url = "/v2/tenants/" + encode(tenantName) + "/services/" + encode(serviceAlias)
+                + "/build-version/" + encode(versionId);
+        ResponseEntity<String> resp = RegionApiSupport.exchange(clientFactory, regionName, "", API_TYPE, url, "GET",
+                c -> c.get().uri(url).exchange((req, r) -> RegionApiSupport.readAsString(r)));
+        return safeBean(processor.extractBean(resp, Map.class, API_TYPE, url, "GET"));
+    }
+
+    @Override
+    public Map<String, Object> updateBuildVersion(String regionName, String tenantName, String serviceAlias,
+                                                    String versionId, Map<String, Object> body) {
+        String url = "/v2/tenants/" + encode(tenantName) + "/services/" + encode(serviceAlias)
+                + "/build-version/" + encode(versionId);
+        ResponseEntity<String> resp = RegionApiSupport.exchange(clientFactory, regionName, "", API_TYPE, url, "PUT",
+                c -> c.put().uri(url).contentType(MediaType.APPLICATION_JSON)
+                        .body(body == null ? Map.of() : body)
+                        .exchange((req, r) -> RegionApiSupport.readAsString(r)));
+        return safeBean(processor.extractBean(resp, Map.class, API_TYPE, url, "PUT"));
+    }
+
+    @Override
+    public void deleteBuildVersion(String regionName, String tenantName, String serviceAlias,
+                                     String versionId, Map<String, Object> body) {
+        String url = "/v2/tenants/" + encode(tenantName) + "/services/" + encode(serviceAlias)
+                + "/build-version/" + encode(versionId);
+        ResponseEntity<String> resp = RegionApiSupport.exchange(clientFactory, regionName, "", API_TYPE, url, "DELETE",
+                c -> c.method(org.springframework.http.HttpMethod.DELETE).uri(url)
+                        .contentType(MediaType.APPLICATION_JSON).body(body == null ? Map.of() : body)
+                        .exchange((req, r) -> RegionApiSupport.readAsString(r)));
+        processor.checkStatus(resp, API_TYPE, url, "DELETE");
+    }
+
+    @Override
+    public Map<String, Object> getServiceDeployVersion(String regionName, String tenantName, String serviceAlias) {
+        String url = "/v2/tenants/" + encode(tenantName) + "/services/" + encode(serviceAlias) + "/deployversions";
+        ResponseEntity<String> resp = RegionApiSupport.exchange(clientFactory, regionName, "", API_TYPE, url, "GET",
+                c -> c.get().uri(url).exchange((req, r) -> RegionApiSupport.readAsString(r)));
+        return safeBean(processor.extractBean(resp, Map.class, API_TYPE, url, "GET"));
+    }
+
+    @Override
+    public Map<String, Object> getTeamServicesDeployVersion(String regionName, String tenantName, Map<String, Object> body) {
+        String url = "/v2/tenants/" + encode(tenantName) + "/deployversions";
+        ResponseEntity<String> resp = RegionApiSupport.exchange(clientFactory, regionName, "", API_TYPE, url, "POST",
+                c -> c.post().uri(url).contentType(MediaType.APPLICATION_JSON)
+                        .body(body == null ? Map.of() : body)
+                        .exchange((req, r) -> RegionApiSupport.readAsString(r)));
+        return safeBean(processor.extractBean(resp, Map.class, API_TYPE, url, "POST"));
+    }
+
+    @Override
+    public Map<String, Object> serviceSourceCheck(String regionName, String tenantName, Map<String, Object> body) {
+        String url = "/v2/tenants/" + encode(tenantName) + "/servicecheck";
+        ResponseEntity<String> resp = RegionApiSupport.exchange(clientFactory, regionName, "", API_TYPE, url, "POST",
+                c -> c.post().uri(url).contentType(MediaType.APPLICATION_JSON)
+                        .body(body == null ? Map.of() : body)
+                        .exchange((req, r) -> RegionApiSupport.readAsString(r)));
+        return safeBean(processor.extractBean(resp, Map.class, API_TYPE, url, "POST"));
+    }
+
+    @Override
+    public Map<String, Object> getServiceCheckInfo(String regionName, String tenantName, String uuid) {
+        String url = "/v2/tenants/" + encode(tenantName) + "/servicecheck/" + encode(uuid);
+        ResponseEntity<String> resp = RegionApiSupport.exchange(clientFactory, regionName, "", API_TYPE, url, "GET",
+                c -> c.get().uri(url).exchange((req, r) -> RegionApiSupport.readAsString(r)));
+        return safeBean(processor.extractBean(resp, Map.class, API_TYPE, url, "GET"));
+    }
+
+    @Override
+    public Map<String, Object> getBuildStatus(String regionName, String tenantName, String pluginId, String buildVersion) {
+        String url = "/v2/tenants/" + encode(tenantName) + "/plugin/" + encode(pluginId)
+                + "/build-version/" + encode(buildVersion);
+        ResponseEntity<String> resp = RegionApiSupport.exchange(clientFactory, regionName, "", API_TYPE, url, "GET",
+                c -> c.get().uri(url).exchange((req, r) -> RegionApiSupport.readAsString(r)));
+        return safeBean(processor.extractBean(resp, Map.class, API_TYPE, url, "GET"));
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Map<String, Object> safeBean(Object obj) {
         return obj == null ? Map.of() : (Map) obj;

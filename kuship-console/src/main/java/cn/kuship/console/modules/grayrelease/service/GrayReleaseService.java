@@ -4,6 +4,7 @@ import cn.kuship.console.common.exception.ServiceHandleException;
 import cn.kuship.console.modules.account.entity.Tenants;
 import cn.kuship.console.modules.application.entity.ServiceGroup;
 import cn.kuship.console.modules.application.repository.ServiceGroupRepository;
+import cn.kuship.console.modules.grayrelease.api.GrayReleaseOperations;
 import cn.kuship.console.modules.grayrelease.entity.GrayReleaseRecord;
 import cn.kuship.console.modules.grayrelease.entity.GrayReleaseStatus;
 import cn.kuship.console.modules.grayrelease.entity.ServiceMappingEntry;
@@ -41,18 +42,24 @@ public class GrayReleaseService {
     private final GrayReleaseTemplateInstaller installer;
     private final ApisixRouteWeightUpdater apisixUpdater;
     private final ServiceGroupRepository serviceGroupRepo;
+    private final GrayReleaseOperations grayReleaseOps;
     private final boolean skipApisixUpdate;
+    private final boolean skipRegionTemplateInstall;
 
     public GrayReleaseService(GrayReleaseRecordRepository repo,
                                  GrayReleaseTemplateInstaller installer,
                                  ApisixRouteWeightUpdater apisixUpdater,
                                  ServiceGroupRepository serviceGroupRepo,
-                                 @Value("${kuship.gray-release.skip-apisix-update:false}") boolean skipApisixUpdate) {
+                                 GrayReleaseOperations grayReleaseOps,
+                                 @Value("${kuship.gray-release.skip-apisix-update:false}") boolean skipApisixUpdate,
+                                 @Value("${kuship.gray-release.skip-region-template-install:false}") boolean skipRegionTemplateInstall) {
         this.repo = repo;
         this.installer = installer;
         this.apisixUpdater = apisixUpdater;
         this.serviceGroupRepo = serviceGroupRepo;
+        this.grayReleaseOps = grayReleaseOps;
         this.skipApisixUpdate = skipApisixUpdate;
+        this.skipRegionTemplateInstall = skipRegionTemplateInstall;
     }
 
     @Transactional
@@ -71,8 +78,11 @@ public class GrayReleaseService {
                             "该应用已存在进行中的灰度发布");
                 });
 
+        // TODO(migrate-console-app-install): 引入 region_app 映射后用真实 regionAppId 替换 appId
         GrayReleaseTemplateInstaller.Result installed = installer.installGrayServiceGroup(
-                team.getTenantId(), appId, req.templateId(), req.templateVersion(),
+                regionName, team.getTenantName(), team.getTenantId(),
+                appId, appId,
+                req.templateId(), req.templateVersion(),
                 req.marketName(), req.installFromCloud());
 
         if (!skipApisixUpdate) {
@@ -134,6 +144,11 @@ public class GrayReleaseService {
                         "apisix-route 权重更新失败", e);
             }
         }
+        if (!skipRegionTemplateInstall) {
+            // TODO(migrate-console-app-install): regionAppId 替换为真实 region_app 映射
+            grayReleaseOps.updateAppGrayRelease(regionName, team.getTenantName(), appId,
+                    Map.of("gray_ratio", newRatio));
+        }
         record.setGrayRatio(newRatio);
         record.setUpdateTime(LocalDateTime.now());
         return repo.save(record);
@@ -163,7 +178,10 @@ public class GrayReleaseService {
                         record.getId(), appId, e.getMessage());
             }
         }
-        installer.uninstallGrayServiceGroup(team.getTenantId(), appId, record.getGrayUpgradeGroupId());
+        String namespace = team.getNamespace() != null && !team.getNamespace().isBlank()
+                ? team.getNamespace() : team.getTenantName();
+        installer.uninstallGrayServiceGroup(regionName, team.getTenantName(), team.getTenantId(),
+                appId, appId, namespace, record.getGrayUpgradeGroupId());
         record.setStatus(GrayReleaseStatus.CANCELLED);
         record.setGrayRatio(0);
         record.setUpdateTime(LocalDateTime.now());

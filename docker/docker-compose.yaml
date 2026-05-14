@@ -74,7 +74,7 @@ services:
       - "80:80"
       - "443:443"
       - "6443:6443"
-      - "8443:18443"  # 主机 8443 → 容器 18443（kubectl port-forward 转发 svc/rbd-api-api:8443）；容器内 8443 留给 apisix(hostNetwork)
+      - "8443:8443"  # 主机 8443 → 容器内 apisix(hostNetwork)，apisix ApisixRoute "rbd-api-api"（stream/TCP，ingressPort:8443）透传到 svc/rbd-api-api:8443；kuship-console 跑在宿主机时通过此口走 mTLS 调 rbd-api，与 rbd-app-ui 在 k3s pod 内走 ClusterDNS 同源不同路
     volumes:
       - rainbond-data:/opt/rainbond
       - ../rainbond-images-${ARCH:-arm64}.tar.zst:/tmp/rainbond-images.tar.zst:ro

@@ -9,11 +9,8 @@ import cn.kuship.console.modules.account.entity.Tenants;
 import cn.kuship.console.modules.account.repository.TenantsRepository;
 import cn.kuship.console.modules.application.api.RegionApiSupport;
 import cn.kuship.console.modules.application.entity.ServiceGroup;
-import cn.kuship.console.modules.application.entity.ServiceGroupRelation;
-import cn.kuship.console.modules.application.entity.TenantService;
-import cn.kuship.console.modules.application.repository.ServiceGroupRelationRepository;
 import cn.kuship.console.modules.application.repository.ServiceGroupRepository;
-import cn.kuship.console.modules.application.repository.TenantServiceRepository;
+import cn.kuship.console.modules.application.service.AppsListAggregator;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,13 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * 对齐 rainbond {@code views/public_areas.py}：{@code TeamArchView} + {@code TeamAppSortViewView}。
@@ -45,23 +40,20 @@ public class TeamPublicAreasController {
 
     private final TenantsRepository tenantsRepo;
     private final ServiceGroupRepository groupRepo;
-    private final TenantServiceRepository serviceRepo;
-    private final ServiceGroupRelationRepository relationRepo;
     private final RegionClientFactory clientFactory;
     private final RegionApiResponseProcessor processor;
+    private final AppsListAggregator appsListAggregator;
 
     public TeamPublicAreasController(TenantsRepository tenantsRepo,
                                        ServiceGroupRepository groupRepo,
-                                       TenantServiceRepository serviceRepo,
-                                       ServiceGroupRelationRepository relationRepo,
                                        RegionClientFactory clientFactory,
-                                       RegionApiResponseProcessor processor) {
+                                       RegionApiResponseProcessor processor,
+                                       AppsListAggregator appsListAggregator) {
         this.tenantsRepo = tenantsRepo;
         this.groupRepo = groupRepo;
-        this.serviceRepo = serviceRepo;
-        this.relationRepo = relationRepo;
         this.clientFactory = clientFactory;
         this.processor = processor;
+        this.appsListAggregator = appsListAggregator;
     }
 
     /**
@@ -94,8 +86,11 @@ public class TeamPublicAreasController {
 
     /**
      * 团队应用列表（带分页 / sort / query）。对齐 rainbond {@code TeamAppSortViewView}
-     * （{@code public_areas.py:538}）。当前实现仅返回 group 基础字段 + service_list；
-     * region 状态 / 资源聚合（rainbond {@code group_service.get_multi_apps_all_info}）留待后续 hardening。
+     * （{@code public_areas.py:538}）+ {@code group_service.get_multi_apps_all_info}。
+     *
+     * <p>聚合 region {@code services_status} + {@code appstatuses} 拿组件 / 应用状态，
+     * 计算 used_mem / used_cpu / run_service_num / allocate_mem / used_disk。
+     * accesses 待 service_domain / service_tcp_domain entity 迁移后补齐，当前返回空列表。
      */
     @GetMapping(value = {"/apps", "/apps/"})
     public ApiResult apps(@PathVariable("team_name") String teamName,
@@ -121,7 +116,7 @@ public class TeamPublicAreasController {
         int ps = (pageSize == null || pageSize < 1) ? 10 : Math.min(pageSize, 200);
         int start = Math.min((p - 1) * ps, total);
         int end = Math.min(start + ps, total);
-        List<ServiceGroup> pageGroups = groups.subList(start, end);
+        List<ServiceGroup> pageGroups = new ArrayList<>(groups.subList(start, end));
 
         Map<String, Object> bean = new LinkedHashMap<>();
         bean.put("total", total);
@@ -130,48 +125,8 @@ public class TeamPublicAreasController {
             return GeneralMessage.okWithExtras(bean, List.of(), null);
         }
 
-        List<Integer> groupIds = pageGroups.stream().map(ServiceGroup::getId).toList();
-        List<ServiceGroupRelation> relations = relationRepo.findByGroupIdIn(groupIds);
-        Set<String> serviceIds = relations.stream()
-                .map(ServiceGroupRelation::getServiceId).collect(Collectors.toSet());
-        List<TenantService> services = serviceIds.isEmpty()
-                ? List.of()
-                : serviceRepo.findByServiceIdIn(new ArrayList<>(serviceIds));
-        Map<String, TenantService> svcById = services.stream()
-                .collect(Collectors.toMap(TenantService::getServiceId, s -> s, (a, b) -> a));
-
-        Map<Integer, List<Map<String, Object>>> groupServiceMap = new HashMap<>();
-        for (ServiceGroupRelation r : relations) {
-            TenantService s = svcById.get(r.getServiceId());
-            if (s == null) continue;
-            Map<String, Object> svc = new LinkedHashMap<>();
-            svc.put("service_id", s.getServiceId());
-            svc.put("service_cname", s.getServiceCname());
-            svc.put("service_alias", s.getServiceAlias());
-            groupServiceMap.computeIfAbsent(r.getGroupId(), k -> new ArrayList<>()).add(svc);
-        }
-
-        List<Map<String, Object>> apps = new ArrayList<>();
-        for (ServiceGroup g : pageGroups) {
-            Map<String, Object> app = new LinkedHashMap<>();
-            app.put("group_id", g.getId());
-            app.put("ID", g.getId());
-            app.put("group_name", g.getGroupName());
-            app.put("region_name", g.getRegionName());
-            app.put("note", g.getNote());
-            app.put("username", g.getUsername());
-            app.put("create_time", g.getCreateTime());
-            app.put("update_time", g.getUpdateTime());
-            app.put("app_type", g.getAppType());
-            app.put("governance_mode", g.getGovernanceMode());
-            app.put("services", groupServiceMap.getOrDefault(g.getId(), List.of()));
-            // 状态 / 资源占位（待 group_service.get_multi_apps_all_info 迁移完整后填充）
-            app.put("run_service_num", 0);
-            app.put("services_num", groupServiceMap.getOrDefault(g.getId(), List.of()).size());
-            app.put("used_mem", 0);
-            app.put("used_cpu", 0);
-            apps.add(app);
-        }
+        List<Map<String, Object>> apps = appsListAggregator.aggregate(
+                pageGroups, tenant.getTenantId(), tenant.getTenantName(), tenant.getEnterpriseId(), sort);
         return GeneralMessage.okWithExtras(bean, apps, null);
     }
 }

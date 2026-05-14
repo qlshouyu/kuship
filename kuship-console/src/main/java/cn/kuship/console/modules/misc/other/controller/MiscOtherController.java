@@ -112,23 +112,8 @@ public class MiscOtherController {
         return GeneralMessage.ok(bean);
     }
 
-    @GetMapping(value = {"/console/teams/{team_name}/resources", "/console/teams/{team_name}/resources/"})
-    public ApiResult teamResources(@PathVariable("team_name") String teamName) {
-        Tenants team = tenantsRepo.findByTenantName(teamName).orElse(null);
-        if (team == null) {
-            return GeneralMessage.ok(Map.of("exists", false));
-        }
-        var services = serviceRepo.findByTenantId(team.getTenantId());
-        int usedMemory = services.stream()
-                .mapToInt(s -> s.getMinMemory() == null ? 0 : s.getMinMemory()
-                        * (s.getMinNode() == null ? 1 : s.getMinNode()))
-                .sum();
-        return GeneralMessage.ok(Map.of(
-                "team_name", teamName,
-                "limit_memory", team.getLimitMemory() == null ? 0 : team.getLimitMemory(),
-                "used_memory", usedMemory,
-                "component_count", services.size()));
-    }
+    // /console/teams/{team_name}/resources 由 migrate-console-cluster-extras 子 change 的
+    // TenantResourcesController 接管（region API 透传）。原本地 DB 占位实现已删除。
 
     @GetMapping(value = {"/console/teams/{team_name}/apps/{service_alias}/k8s_attributes",
                           "/console/teams/{team_name}/apps/{service_alias}/k8s_attributes/"})

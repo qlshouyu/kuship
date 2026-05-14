@@ -102,7 +102,11 @@ public class SecurityConfig {
                                     // migrate-console-platform-config — 站点元数据匿名公开
                                     "/console/config/info", "/console/config/info/").permitAll()
                             // 全局自定义配置：对齐 rainbond CustomConfigsCLView (BaseApiView, 无需 JWT)
-                            .requestMatchers("/console/custom_configs", "/console/custom_configs/").permitAll();
+                            .requestMatchers("/console/custom_configs", "/console/custom_configs/").permitAll()
+                            // migrate-console-gateway-domain — API Gateway 透传端点 (/api-gateway/v1/**)
+                            // 不带 /console 前缀，需在 authenticated 链中显式列出（不 permitAll，必须 JWT）。
+                            .requestMatchers("/api-gateway/v1/**", "/api-gateway/convert", "/api-gateway/convert/")
+                            .authenticated();
                     if (allowPublicInit) {
                         auth.requestMatchers(HttpMethod.POST, "/console/init/perms", "/console/init/perms/").permitAll();
                     }

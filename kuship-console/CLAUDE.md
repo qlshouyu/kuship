@@ -339,6 +339,31 @@ plugin/
 
 **保留字 `desc`**：`tenant_plugin` / `tenant_plugin_share` / `rainbond_center_plugin` 三张表都有 `desc` 列；entity 用 `@Column(name = "\`desc\`")` 反引号转义，Java 字段统一命名 `describe`。
 
+### Helm Release 域（migrate-console-helm-release）
+
+`cn.kuship.console.modules.team` 首次落地：rainbond-console `console/views/team_resources.py:210-291` 中 5 个 helm release view 的 9 个 HTTP 端点全部迁入 kuship-console。
+
+**Controllers**：
+- `HelmReleasesController` — `/console/teams/{team_name}/regions/{region_name}/helm/releases{,/{release_name}{,/history,/rollback}}` + `/chart-preview`，9 个 HTTP 方法（list/install/preview/getDetail/upgrade/uninstall/getHistory/rollback）
+
+**新增 Entity**（1 张本地表 JPA 映射）：
+- `TeamHelmReleaseSource`（`team_helm_release_source`，14 列，PK `ID` Integer + `(region_name, namespace, release_name)` 唯一键 + `values_yaml` TEXT）—— rainbond Django migration `0004_teamhelmreleasesource.py` + `0005_teamhelmreleasesource_values_yaml.py` 拥有 schema
+
+**扩充 Region API**：
+- `HelmOperations` 新增 8 method（基于 `migrate-console-app-market` 已有的 6 method）：getTenantHelmReleases / installTenantHelmRelease / previewTenantHelmChart / getTenantHelmReleaseDetail / upgradeTenantHelmRelease / uninstallTenantHelmRelease / getTenantHelmReleaseHistory / rollbackTenantHelmRelease，全部由 `HelmOperationsImpl`（`@Primary`）实现，转发 region 后端 `/v2/tenants/{tenant_name}/helm/*`
+
+**业务规则迁移**（service 层 5 个 helper，对齐 Python `team_resources.py:20-161`）：
+- `resolveNamespace(team_name)` — `Tenants.namespace` → `tenant_name` → 404
+- `buildInstallBody(raw, ns)` — `source_type=store` 且 `repo_name` 存在时查 `helm_repo` 改为 `source_type=repo` + 注入 `repo_url/username/password`
+- `enrichReleaseList / enrichReleaseDetail` — 用 `team_helm_release_source` 注入 `source_info`（store_locked / manual_select），detail 还会用本地 `values_yaml` 覆盖 region 返回的 `summary.values`
+- `persistReleaseSource` — install/upgrade 成功后落库；**保留原始 `raw_body.source_type`** 而非转换后的 `repo`（与 Python 行为一致）
+
+**写两阶段策略**：
+- install/upgrade：先调 region → 再 `save_or_update`；落库失败仅 ERROR 日志（不抛给用户）
+- uninstall：先调 region 释放 K8s 资源 → 再 `deleteByRegionNameAndNamespaceAndReleaseName`；删行失败仅 ERROR 日志
+
+**测试覆盖**：`HelmReleaseServiceTest` 21 用例（纯 Mockito）+ `HelmReleaseIntegrationTest` 10 用例（@SpringBootTest + @MockitoBean HelmOperations，需要本地 MySQL）。
+
 ### 杂项收尾（migrate-console-misc）
 
 `cn.kuship.console.modules.misc` 落地剩余 14 个 view 的 ~50 endpoint：消息中心 / Webhook / MCP / 文件上传 / 登录事件 / 操作审计 / Console 升级 / 企业配置 / SMS / KubeBlocks / API Gateway / 占位收尾。
@@ -899,6 +924,438 @@ bash scripts/native-test.sh --quick     # 仅 NativeSmokeTest + Hints registrar 
 
 **14 接口骨架进度**：本 change 完成 `ClusterOperations` 8 method（getClusterId / activateLicense / getLicenseStatus / getRegionFeatures / getRegionNamespaces / getRegionResources / setTenantLimit / listTenantsInRegion）；其余继续等待业务 change 落地。
 
+### 第三方组件运行时（migrate-console-third-party-runtime）
+
+`cn.kuship.console.modules.thirdparty` 落地路线图 P0 #8 —— rainbond `console/views/app_create/source_outer.py:ThirdPartyAppPodsView,ThirdPartyHealthzView` 6 endpoint 全部迁入 kuship-console，承接 `migrate-console-app-create` 已落地的第三方组件创建后的运行时管理（endpoint CRUD + 健康探针配置）。
+
+**Controllers**（2 个，6 endpoint）：
+- `ThirdPartyEndpointsController` — `/console/teams/{team_name}/apps/{service_alias}/third_party/pods` GET/POST/PUT/DELETE
+- `ThirdPartyHealthController` — `/console/teams/{team_name}/apps/{service_alias}/3rd-party/health` GET/PUT
+- 路径段 `third_party`（下划线）与 `3rd-party`（连字符 + 数字简写）拼写不一致是 rainbond 历史遗留，本 change 严格保留 URL 不修复
+
+**Region API**（新接口非 14 接口骨架）：
+- `modules/thirdparty/api/ThirdPartyServiceOperations.java` 6 method（getEndpoints / postEndpoints / putEndpoints / deleteEndpoints / getHealth / putHealth）
+- `ThirdPartyServiceOperationsImpl @Primary` 实现：
+  - URL 模板 `/v2/tenants/{namespace}/services/{alias}/{endpoints|3rd-party/probe}`，`namespace` 取自 `Tenants.namespace || tenant_name`（缺失时 fallback）
+  - **关键约束**：POST/PUT/DELETE endpoints 三个 method 在 RestClient 链上显式 `.header("Resource-Validation", "true")`（与 rainbond `_set_headers(token, resource_validation="true")` 一致）；GET endpoints / GET health / PUT health 不加该 header
+  - DELETE with body 用 `c.method(HttpMethod.DELETE).uri(url).contentType(JSON).body(body)` 模式（Spring 6 RestClient 写法）
+
+**业务规则**（`ThirdPartyEndpointService` facade）：
+- 公共 helper `validateThirdPartyService(teamName, alias)` 先 `tenantsRepo.findByTenantName` → `serviceRepo.findByTenantIdAndServiceAlias` → 校验 `serviceSource == "third_party"`
+- 不存在 → `ServiceHandleException(404, "service not found", "组件不存在")`
+- 非 third_party → `ServiceHandleException(400, "service is not a third-party service", "组件不是第三方组件")`（**比 rainbond 严一档**：rainbond 端 view 未做该校验，本 change 显式拦截内部组件误调）
+- region_name 来自 `service.serviceRegion`，无需 path 变量
+
+**Body 透传规则**：
+- POST/PUT endpoints body=`{"address":"<ip:port>","is_online":true}` 单条 或 `{"endpoints":[{...}]}` 批量；controller 不强 typed DTO，`@RequestBody Map<String, Object>` 透传
+- DELETE endpoints body=`{"ep_id":"<id>"}`；同样 Map 透传
+- PUT health body=`{"mode":"tcp","scheme":"http","path":"/","port":80,"period":30,"timeout":3}` 透传
+
+**权限**：
+- 读端点 `@RequirePerm(PermCode.APP_OVERVIEW_DESCRIBE)`
+- 写端点 `@RequirePerm(PermCode.APP_CREATE_PERMS)`（rainbond 端无独立 manage_team_app perm code，沿用 app_create_perms）
+
+**测试覆盖**：
+- 单测 `ThirdPartyServiceOperationsImplTest`（9 用例）：6 method × happy + Resource-Validation header 在/不在断言 + namespace fallback + team 不存在 + 5xx 透传
+- 集成测试 `ThirdPartyRuntimeIntegrationTest`（11 用例）：endpoint CRUD 4 用例 + 批量 POST + health GET/PUT + 内部组件 400（pods + health 各一次）+ 不存在的 alias 404 + region 5xx 透传
+
+**14 接口骨架进度不变**：本 change 新接口在 `modules/thirdparty/api/`（业务域接口路径），不影响 14 接口骨架计数。
+
+### 集群基础信息透传（migrate-console-cluster-extras）
+
+`cn.kuship.console.modules.region.controller.cluster` 子包落地路线图 P0 #1 热身项 ——
+`ClusterOperations` 接口中既存的 5 个 default unsupported method 全部清桩，4 个新 controller 暴露给 UI。
+
+**新增 Controllers**（4 个，5 endpoint，按 design.md 锚点）：
+- `ClusterInfoController` — `GET /console/enterprise/{enterprise_id}/regions/{region_name}/info` (`@RequireEnterpriseAdmin`)
+- `ClusterEventsController` — `GET /console/enterprise/{enterprise_id}/regions/{region_name}/cluster-events?...` query 透传
+- `ClusterNodesController` — `GET .../nodes` 列表 + `GET .../nodes/{node_name}` 详情；后续 `migrate-console-cluster-nodes` 子 change 在同 controller **追加** action / labels / taints / container 端点，不替换 GET 路径
+- `TenantResourcesController` — `GET /console/teams/{team_name}/resources?region_name=&enterprise_id=`（`@RequirePerm(TEAM_REGION_DESCRIBE)`）；接管原 `MiscOtherController.teamResources` 占位（已删除）
+
+**ClusterOperationsImpl 5 method**（直接在原 @Primary impl 上追加，不新建文件）：
+- `getResources(rn, tn, eid)` — `tenant_name` 路径段替换为 `Tenants.namespace`（缺失回退 `tenant_name`）
+- `getClusterInfo(rn)` — region 端 `/v2/cluster/info` 不支持时（404）降级为读本地 `region_info` entity，不抛异常
+- `getClusterEvents(rn, body)` — `Map<String, Object>` body 序列化为 URL query string（TreeMap 字典序排序，全部 URL encode；空 value 跳过）
+- `getNodes(rn)` / `getNodeDetail(rn, nodeName)` — 1:1 透传；`nodeName` URL encode 防点号节点名出错
+
+**关键决策**：
+- region 路径锚点参考 design.md "Region API URL 表"；`getResources` 路径段差异（tenant_name vs namespace）与 helm-release / gateway-certificate 一致
+- `getClusterEvents` 接口签名 `body` 实际是 query map（rainbond `get_cluster_resource(rn, "events", params)` 行为），不发 request body；保留接口签名不破坏 default 占位兼容性
+- `/v2/cluster/info` 在 region Go 端是否真实存在需联动验证；本地降级路径用 `RegionInfoEntityRepository.findByRegionName` 输出 `region_name/region_alias/url/tcpdomain/httpdomain/status/scope/provider` 字段子集
+- 与后续子 change 解耦边界：本 change 只做 region 透传不做业务聚合；business-level 富化（节点 metrics / Pod 数 / cordon/drain）由 `ClusterNodeOperations` 新接口承载，不污染 `ClusterOperations`
+
+**Conflict 解决**：`/console/teams/{team_name}/resources` 原由 `MiscOtherController.teamResources`（misc 阶段占位，仅返本地 DB 汇总）持有；本 change 启动后路径冲突，按 design 决策删除占位，由 `TenantResourcesController` 接管 region 透传职责。响应 shape 改为 region 实时 `cpu/memory/disk` 等字段（替换 `used_memory/limit_memory/component_count` 占位 shape）。
+
+
+<!-- ↓↓↓ 6 路并行 P0 子 change 整合产物（leader 合并自 6 worktree） ↓↓↓ -->
+
+<!-- migrate-console-dependency-extras -->
+
+> 此文件由子 change 工程师生成，供 leader 合并到 kuship-console/CLAUDE.md 的「应用与组件管理」段落。
+
+#### 批量组件依赖与旧版卷依赖（migrate-console-dependency-extras）
+
+`ServiceDependencyOperations` 3 个 default-unsupported method 已在 `ServiceDependencyOperationsImpl` 覆盖：
+
+| method | HTTP | region 路径 | 说明 |
+|--------|------|-------------|------|
+| `addDependencies(rn, tn, alias, body)` | POST | `/v2/tenants/{ns}/services/{alias}/dependencys` | 批量添加（**`dependencys` 保留 rainbond 历史拼写**） |
+| `addVolumeDependency(rn, tn, alias, body)` | POST | `/v2/tenants/{ns}/services/{alias}/volume-dependency` | 旧版挂载依赖（仅内部调用） |
+| `deleteVolumeDependency(rn, tn, alias, body)` | DELETE | `/v2/tenants/{ns}/services/{alias}/volume-dependency` | 旧版删除挂载依赖（仅内部调用） |
+
+### 新增 controller endpoint
+
+`AppDependencyController` 追加：
+
+- `POST /console/teams/{team_name}/apps/{service_alias}/dependency-list`（trailing slash 兼容）
+  - 权限：`@RequirePerm(PermCode.APP_CREATE_PERMS)`
+  - body：`{"dep_service_ids": ["id1", "id2", ...]}`
+  - 委托 `AppDependencyBatchService.addBatch` 处理
+
+### 新增 service
+
+`AppDependencyBatchService`（`modules/application/service/`）：
+
+- `@Transactional public Map<String, Object> addBatch(teamName, serviceAlias, body)`
+- 两阶段写：
+  1. 去重（已存在跳过，不报错）
+  2. 循环依赖 BFS 检测（抛 `ServiceHandleException(400, "circular dependency", "依赖关系不能形成循环")`）
+  3. 本地批量 INSERT `tenant_service_relation`
+  4. 调 region `addDependencies`（body 注入 `tenant_id = Tenants.namespace`）
+  5. region 失败 → 事务自动回滚 step 3
+
+### 关键约束
+
+- region 路径 `dependencys` 拼写**不得修改**（rainbond region 端历史）
+- `addVolumeDependency` / `deleteVolumeDependency` **无 console controller URL**（rainbond 5.0+ 前端已不直调），仅供 helm-install / app-import 子 change 内部调用
+- `volume-dependency` region method 的接线由 `migrate-console-helm-install` / `migrate-console-app-import-export` 负责
+
+<!-- migrate-console-volume-extras -->
+
+`cn.kuship.console.modules.application`（application 模块扩展）落地"组件挂载依赖存储"（mnt）全套端点，
+以及 `ServiceVolumeOperations` 接口 6 个 region API method 的完整实现。
+
+**新增 Entity**（1 张本地表 JPA 映射）：
+- `TenantServiceMountRelation`（tenant_service_mnt_relation，5 列：tenantId / serviceId / depServiceId / mntName / mntDir）
+
+**新增 Repository**：
+- `TenantServiceMountRelationRepository`：5 个 finder / deleter
+
+**新增 Service**：
+- `AppMntService`：getMounted / getUnmounted / addMnt / deleteMnt
+
+**新增 Controller**：
+- `AppMntController`：
+  - `GET  /console/teams/{team_name}/apps/{service_alias}/mnt?type=mnt|unmnt`
+  - `POST /console/teams/{team_name}/apps/{service_alias}/mnt`
+  - `DELETE /console/teams/{team_name}/apps/{service_alias}/mnt/{dep_vol_id}`
+
+**补全 ServiceVolumeOperationsImpl（6 个 method）**：
+- `getVolumeOptions` → `GET /v2/volume-options`（无 tenant 前缀）
+- `getVolumes` → `GET /v2/tenants/{t}/services/{a}/volumes`
+- `getVolumeStatus` → `GET /v2/tenants/{t}/services/{a}/volumes-status`
+- `getDepVolumes` → `GET /v2/tenants/{t}/services/{a}/depvolumes`
+- `addDepVolumes` → `POST /v2/tenants/{t}/services/{a}/depvolumes`
+- `deleteDepVolumes` → `DELETE /v2/tenants/{t}/services/{a}/depvolumes`（含 JSON body）
+
+**挂载写策略**：
+- `addMnt`：组件 `create_status=complete` 时调 region addDepVolumes；region 失败仅记 WARN，本地 mnt_relation 仍写入
+- `deleteMnt`：region deleteDepVolumes → 404 时忽略，直接删本地行
+- config-file volume 类型挂载返回 400（依赖 service_config_file 表，本 change 不支持）
+
+**未挂载过滤规则**（对齐 Python `mnt_service.get_service_unmount_volume_list`）：
+- 排除当前组件自身存储
+- 仅保留 access_mode=RWX
+- 排除 config-file / local-path 类型
+- 排除有状态组件（extend_method in {state, singleton}）的存储
+- 排除已在 mnt_relation 中的存储
+
+<!-- migrate-console-gateway-certificate -->
+
+> 本文件补充 `kuship-console/CLAUDE.md` 的"网关证书 CRUD"子域说明。
+> 不修改 `kuship-console/CLAUDE.md`，内容由归档流程合并。
+
+#### 网关证书 CRUD（migrate-console-gateway-certificate）
+
+`cn.kuship.console.modules.gateway.cert` 落地网关证书 CRUD 与域名校验能力，
+对齐 rainbond `console/views/app_config/app_domain.py:61-298,490-498`。
+
+### Controllers（4 个，~7 endpoint）
+
+| Controller | 路径 | 方法 | rainbond 锚点 |
+|---|---|---|---|
+| `TenantCertificateController` | `/console/teams/{team_name}/certificates` | GET / POST | `urls.py:630 TenantCertificateView` |
+| `TenantCertificateManageController` | `/console/teams/{team_name}/certificates/{certificate_id}` | PUT / DELETE | `urls.py:631-632 TenantCertificateManageView` |
+| `CalibrationCertificateController` | `/console/teams/{team_name}/calibration_certificate` | POST | `urls.py:655 CalibrationCertificate` |
+| `EnterpriseCertificateController` | `/console/enterprise/team/certificate` | POST（占位） | `urls.py:932 CertificateView` |
+
+- `TenantCertificateManageController` 仅 PUT / DELETE，无 GET（对齐 rainbond 无 get 方法行为）
+- `EnterpriseCertificateController` 永远返回 `{is_certificate: 1}`，不调 region，预留给 enterprise 子 change
+
+### service_domain_certificate 表说明
+
+8 列映射（`ServiceDomainCertificate` entity）：
+
+| 列名 | 类型 | 说明 |
+|---|---|---|
+| `ID` | INT（PK）| 大写，JPA `@Column(name="ID")` |
+| `tenant_id` | varchar(32) | 租户 UUID |
+| `certificate_id` | varchar(50) | console 生成的 32-char UUID |
+| `private_key` | longtext | **原文 PEM，不编码** |
+| `certificate` | longtext | **PEM 经 Base64 编码后存储** |
+| `certificate_type` | longtext | 类型字符串，`"gateway"` 触发双写 |
+| `create_time` | datetime | 创建时间 |
+| `alias` | varchar(64) | 租户范围内唯一，≤64 字符 |
+
+### Base64 编码约束（决策 1）
+
+与 rainbond Python 端互操作的硬约束：
+
+- **写入**：`certificate` 列 = `Base64.getEncoder().encodeToString(pemBytes)`
+- **读取**：`Base64.getDecoder().decode(cert.getCertificate())` → PEM 明文
+- `private_key` 列**直存原文 PEM**（不编码），与 rainbond 端跨服务读写兼容
+- 日志和异常消息中**不**暴露 `private_key` / `certificate` 全文（安全约束）
+
+### gateway 类型双写顺序（决策 5）
+
+与 rainbond Python 端 **相反**（kuship 改进）：
+
+| 操作 | kuship 顺序 | 说明 |
+|---|---|---|
+| 创建 | 先本地 INSERT（`@Transactional`）后 region `createCertificate` | region 失败 → 事务回滚本地行，无孤儿数据 |
+| 更新 | 先 region → 后本地 UPDATE | 同事务，region 失败回滚 |
+| 删除 | 先 region `deleteCertificate` → 后本地 DELETE | 释放 K8s GatewayTLS 资源后才删本地行 |
+
+类型切换规则（`updateCertificate`）：
+- 普通 → gateway：调 region `createCertificate`
+- gateway → 普通：调 region `deleteCertificate`
+- gateway → gateway：调 region `updateCertificate`
+
+### CertificateAnalyzer（X.509 工具）
+
+纯 JDK + BouncyCastle（项目已有 `bcprov-jdk18on` / `bcpkix-jdk18on`）：
+
+- PKCS#8 私钥：`KeyFactory.getInstance("RSA"/"EC").generatePrivate(PKCS8EncodedKeySpec)`
+- PKCS#1 RSA 私钥：BouncyCastle `RSAPrivateKey.getInstance(der)` → `RSAPrivateKeySpec`
+- RSA 公私钥匹配：比对 `RSAPublicKey.getModulus()` 与 `RSAPrivateKey.getModulus()`
+- ECDSA 公私钥匹配：BouncyCastle 标量乘法 `G × s` 与证书公钥点比对
+- SAN 提取：`cert.getSubjectAlternativeNames()` type=2（dNSName）/ type=7（iPAddress）
+
+### GatewayOperations 5 method 实现
+
+`GatewayOperationsImpl`（已 `@Primary`）新增 5 个 override：
+
+| method | HTTP | 路径 |
+|---|---|---|
+| `getCertificate` | GET | `/v2/tenants/{tenant_name}/gateway-certificate` |
+| `createCertificate` | POST | `/v2/tenants/{tenant_name}/gateway-certificate` |
+| `updateCertificate` | PUT | `/v2/tenants/{tenant_name}/gateway-certificate` |
+| `deleteCertificate` | DELETE | `/v2/tenants/{tenant_name}/gateway-certificate?namespace=&name=` |
+| `updateIngressesByCertificate` | PUT | `/v2/tenants/{region_tenant_name}/gateway/certificate`（namespace 路径段） |
+
+注意 `updateIngressesByCertificate` 路径段用 `tenant.namespace`（region_tenant_name），
+从 `TenantsRepository.findByTenantName(tenantName).getNamespace()` 取。
+
+### 测试覆盖
+
+| 测试类 | 类型 | 用例数 |
+|---|---|---|
+| `CertificateAnalyzerTest` | 纯单测 | 9 |
+| `CertGenerator` | 测试夹具（无测试方法） | — |
+| `CertificateServiceTest` | Mockito 单测 | 9 |
+| `GatewayOperationsImplTest` | MockRestServiceServer 单测 | 6 |
+| 集成测试（6.1-6.3） | 需用户联动（真实 DB） | 待运行 |
+
+所有 24 个单测均通过（`mvn -DskipTests package` + `mvn -Dtest=... test`）。
+
+<!-- migrate-console-cluster-nodes -->
+
+`cn.kuship.console.modules.region.controller.cluster` 落地 K8s 集群节点查询与操作的 7 个端点，
+对齐 rainbond-console `GetNodes / GetNode / NodeAction / NodeLabelsOperate / NodeTaintOperate`。
+
+#### 端点表
+
+| 方法 | 路径 | Python 锚点 | 鉴权 |
+|------|------|------------|------|
+| GET  | `/console/enterprise/{enterprise_id}/regions/{region_name}/nodes` | `GetNodes.get` | `@RequireEnterpriseAdmin` |
+| GET  | `/console/enterprise/{enterprise_id}/regions/{region_name}/nodes/{node_name}` | `GetNode.get` | `@RequireEnterpriseAdmin` |
+| POST | `/console/enterprise/{enterprise_id}/regions/{region_name}/nodes/{node_name}/action` | `NodeAction.post` | `@RequireEnterpriseAdmin` |
+| GET  | `/console/enterprise/{enterprise_id}/regions/{region_name}/nodes/{node_name}/labels` | `NodeLabelsOperate.get` | `@RequireEnterpriseAdmin` |
+| PUT  | `/console/enterprise/{enterprise_id}/regions/{region_name}/nodes/{node_name}/labels` | `NodeLabelsOperate.put` | `@RequireEnterpriseAdmin` |
+| GET  | `/console/enterprise/{enterprise_id}/regions/{region_name}/nodes/{node_name}/taints` | `NodeTaintOperate.get` | `@RequireEnterpriseAdmin` |
+| PUT  | `/console/enterprise/{enterprise_id}/regions/{region_name}/nodes/{node_name}/taints` | `NodeTaintOperate.put` | `@RequireEnterpriseAdmin` |
+
+#### 模块结构（新增/修改）
+
+```
+modules/region/
+├── controller/cluster/
+│   └── ClusterNodesController.java    [新建] 7 个端点
+└── service/
+    └── ClusterNodeService.java        [新建] 节点状态转换 + action 白名单校验
+
+infrastructure/region/api/
+└── ClusterOperations.java             [修改] 追加 7 个节点 method 声明
+
+modules/region/api/
+└── ClusterOperationsImpl.java         [修改] 追加 7 个节点 method 实现（未动已有 8 个）
+```
+
+#### 节点状态计算（对齐 Python）
+
+```java
+// conditions 数组推导：type=Ready && status=True → "Ready"；否则 "NotReady"
+// unschedulable=true → 追加 ",SchedulingDisabled"
+```
+
+#### NodeAction 白名单
+
+```java
+Set.of("unschedulable", "reschedulable", "down", "up", "evict")
+```
+
+未知 action → `ServiceHandleException(400, ...)` → HTTP 400
+
+#### Region API 路径
+
+```
+GET  /v2/cluster/nodes
+GET  /v2/cluster/nodes/{node_name}/detail
+POST /v2/cluster/nodes/{node_name}/action/{action}
+GET  /v2/cluster/nodes/{node_name}/labels
+PUT  /v2/cluster/nodes/{node_name}/labels
+GET  /v2/cluster/nodes/{node_name}/taints
+PUT  /v2/cluster/nodes/{node_name}/taints
+```
+
+#### 响应格式
+
+- `GET /nodes`：`bean={cluster_role_count}，list=[节点列表]`（对齐 Python `bean=cluster_role_count, list=nodes`）
+- `GET /nodes/{node_name}`：`bean={节点详情 14 个字段}`
+- `POST .../action`：`bean={}`
+- `GET/PUT .../labels`：`bean={labels:{...}}`（透传 region bean）
+- `GET/PUT .../taints`：`list=[{key,effect,...}]`（透传 region list）
+
+#### 幂等性说明
+
+- `cordon（unschedulable）`：幂等，已 cordon 的节点再次 cordon region 返回 200
+- `evict`：幂等，region API 自身保证幂等
+- 危险操作（drain/evict）权限：严格要求 `@RequireEnterpriseAdmin`，无团队内成员权限可绕过
+
+#### ClusterOperations 接口新增 method（不影响已有 8 个 method）
+
+```java
+// interface 追加（NODES_CHANGE = "migrate-console-cluster-nodes"）
+Map<String, Object> getClusterNodes(String regionName, String enterpriseId);
+Map<String, Object> getNodeDetail(String regionName, String enterpriseId, String nodeName);
+Map<String, Object> operateNodeAction(String regionName, String enterpriseId, String nodeName, String action);
+Map<String, Object> getNodeLabels(String regionName, String enterpriseId, String nodeName);
+Map<String, Object> updateNodeLabels(String regionName, String enterpriseId, String nodeName, Map<String, Object> labels);
+List<Object> getNodeTaints(String regionName, String enterpriseId, String nodeName);
+List<Object> updateNodeTaints(String regionName, String enterpriseId, String nodeName, List<Object> taints);
+```
+
+#### 测试
+
+- 单测：`ClusterOperationsNodeTest`（MockRestServiceServer，8 个 case）
+- 集成测试：`ClusterNodesIntegrationTest`（@SpringBootTest + @MockitoBean，13 个 case）
+  - 注意：mock 配置在 `@BeforeEach` 中（因为 @MockitoBean 每次测试方法后 reset）
+
+<!-- migrate-console-resource-center -->
+
+`cn.kuship.console.modules.region.resource` 落地"命名空间资源管理 / Helm Release 生命周期 / 资源中心工作负载/Pod/事件/日志" 共 20 个端点。
+
+**子域结构**：
+```
+modules/region/resource/
+├── api/ResourceCenterOperationsImpl.java   # @Primary 实现（委托 RegionClientFactory）
+├── controller/
+│   ├── NsResourceController.java          # NS 资源 CRUD（6 端点）
+│   ├── TeamComponentsController.java      # 团队组件列表（1 端点，纯本地）
+│   ├── HelmReleaseController.java         # Helm Release CRUD + 历史 + 回滚 + 预览（9 端点）
+│   ├── ResourceCenterController.java      # 工作负载/Pod/事件/日志 SSE（4 端点）
+│   └── ResourceCenterWsInfoController.java # WsInfo（1 端点）
+├── entity/TeamHelmReleaseSource.java      # team_helm_release_source 表（16 列）
+├── repository/TeamHelmReleaseSourceRepository.java
+└── service/HelmReleaseSourceService.java  # enrich list/detail + saveOrUpdate + deleteByRelease
+```
+
+**新增 region API 接口**：`infrastructure/region/api/ResourceCenterOperations`（含 18 个 method）
++ `ResourceCenterOperationsDefaultImpl`（占位）+ `ResourceCenterOperationsImpl`（@Primary 实现）。
+
+**辅助表 team_helm_release_source**：
+- 记录每次 helm install/upgrade 的来源信息（source_type / repo_name / chart_name 等）
+- 唯一约束 `(region_name, namespace, release_name)`
+- 安装时 upsert，卸载时 delete；并发冲突由 catch DataIntegrityViolationException + retry 兜底
+
+**store→repo 来源转换**（build_helm_install_body）：
+- 对齐 rainbond Python `build_helm_install_body`
+- `source_type=store` 时从 `helm_repo` 表查 `repo_url/username` 替换 body；`password` 不透传
+
+**NS 资源 POST/PUT Content-Type 透传**：
+- controller 接收 `@RequestBody byte[]`（`consumes = "*/*"`），读取 `request.getContentType()` 传给 ops
+- 支持 `application/yaml` / `application/json` / 任意自定义类型
+
+**Pod 日志 SSE**：
+- `@SkipResponseWrapper` 跳过 GeneralMessageResponseBodyAdvice
+- `StreamingResponseBody` 先发 `: heartbeat\n\n` 帧，再 loop 读 InputStream chunk 写出
+- Content-Type: text/event-stream + Cache-Control: no-cache
+
+**WsInfo event_websocket_url 逻辑**：
+- 从 `region_info.wsurl` 取值，拼 `/event_log` 后缀
+- wsurl 为空或 `auto` 时 fallback：`ws://<Host-header-host>:6060/event_log`
+
+**测试**：
+- `ResourceCenterIntegrationTest`（`@SpringBootTest + @MockitoBean ResourceCenterOperations + 真实 DB seed`）：验证 8 个端点 200 / source 持久化 / WsInfo 格式
+- `HelmReleaseSourceServiceTest`（Mockito 单元测试）：验证 saveOrUpdate 去重逻辑 / legacy 默认 / listSourceInfoByReleases key 格式
+
+<!-- migrate-console-gateway-domain -->
+
+#### Controller 清单（15 个，落地到 `modules/gateway/controller/`）
+
+| Controller | 路径 | 方法 |
+|---|---|---|
+| `ServiceDomainController` | `/console/teams/{team_name}/apps/{service_alias}/domain` | GET/POST/DELETE |
+| `HttpStrategyController` | `/console/teams/{team_name}/httpdomain` | GET/POST/PUT/DELETE |
+| `DomainController` | `/console/teams/{team_name}/domain` | GET |
+| `DomainQueryController` | `/console/teams/{team_name}/domain/query` | GET |
+| `ServiceTcpDomainController` | `/console/teams/{team_name}/tcpdomain` | GET/POST/PUT/DELETE |
+| `ServiceTcpDomainQueryController` | `/console/teams/{team_name}/tcpdomain/query` | GET |
+| `AppServiceDomainQueryController` | `/console/enterprise/{enterprise_id}/team/{team_name}/app/{app_id}/domain` | GET |
+| `AppServiceTcpDomainQueryController` | `/console/enterprise/{enterprise_id}/team/{team_name}/app/{app_id}/tcpdomain` | GET |
+| `GatewayCustomConfigurationController` | `/console/teams/{team_name}/domain/{rule_id}/put_gateway` | GET/PUT |
+| `GetPortController` | `/console/teams/{team_name}/domain/get_port` | GET |
+| `GetSeniorUrlController` | `/console/teams/{team_name}/domain/get_senior_url` | GET |
+| `GatewayRouteController` | `/console/teams/{team_name}/gateway-http-route` | GET/POST/PUT/DELETE |
+| `GatewayRouteBatchController` | `/console/teams/{team_name}/batch-gateway-http-route` | GET |
+| `AppApiGatewayController` | `/api-gateway/v1/{tenant_name}/**` | GET/POST/PUT/DELETE |
+| `AppApiGatewayConvertController` | `/api-gateway/convert` | POST |
+
+#### gateway_custom_configuration 表说明
+
+- `ID` 自增主键
+- `rule_id` VARCHAR(128) UNIQUE — 对应 HTTP 规则 ID（http_rule_id）
+- `value` LONGTEXT — JSON 序列化的高级路由参数（set_headers / connection_timeout / proxy_buffering 等 5.1+ 字段）
+- 业务层通过 `GatewayCustomConfigurationService.getValue/setValue` 序列化/反序列化
+
+#### API Gateway 透传 SecurityConfig 配置
+
+`/api-gateway/v1/**` 与 `/api-gateway/convert` 在 `SecurityConfig` 中标记为 `authenticated`（需要 JWT），不 `permitAll`。
+已在 `SecurityConfig.securityFilterChain` 的 `authorizeHttpRequests` 链显式添加。
+
+#### 两阶段写策略
+
+- **HTTP bind**：`@Transactional` 内 INSERT → region bindHttpDomain；region 失败 → 事务回滚（本地 INSERT 撤销）
+- **HTTP unbind**：先 region deleteHttpDomain → 成功后本地 DELETE；region 失败抛异常，本地不删
+- **TCP bind**：同 HTTP bind 策略
+- **高级配置 setValue**：先 region upgradeConfiguration → 成功后本地 INSERT/UPDATE；region 失败不写本地
+
+#### Entity 扩字段情况
+
+- `ServiceDomain`：19 列全字段（含 http_rule_id UNIQUE、domain_heander 保留历史拼写）
+- `ServiceTcpDomain`：14 列全字段（含 tcp_rule_id UNIQUE）
+- `GatewayCustomConfigure`（新增）：3 列
+
 ### Region API client（调用 Rainbond Go 集群）
 
 业务 service 调用 region API 通过 14 个资源域接口（位于 `cn.kuship.console.infrastructure.region.api`）：
@@ -918,7 +1375,7 @@ bash scripts/native-test.sh --quick     # 仅 NativeSmokeTest + Hints registrar 
 | `EventOperations` | `migrate-console-app-runtime` | 事件 |
 | `HelmOperations` | `migrate-console-app-market` | Helm chart / app |
 | `GatewayOperations` | `migrate-console-application-core` / `migrate-console-region-cluster` | 证书/ingress |
-| `ClusterOperations` | `migrate-console-region-cluster` | 集群元信息/节点 |
+| `ClusterOperations` | `migrate-console-region-cluster` (8) + `migrate-console-cluster-extras` (5) | 集群元信息/节点（13/13 完成） |
 
 **注入示例**：
 ```java
@@ -951,6 +1408,156 @@ public class MyBusinessService {
 
 **响应消息汉化**：`RegionErrorMsgEnricher` 自动处理 Helm 接管冲突 / 域名冲突 / 频繁操作短语；其他错误消息透传。**优先使用 region 自带的 `msg_show`**（Go 后端已汉化），仅缺失时由 enricher 兜底。
 
+### KubeBlocks 数据库托管（migrate-console-kubeblocks）
+
+`cn.kuship.console.modules.misc.kubeblocks` 落地路线图 P1 #1 —— `KubeBlocksController` 8 个 stub endpoint 全部接线 + 5 个新 HTTP method（PUT detail / POST manualBackup / DELETE deleteBackups / PUT updateBackupConfig / POST updateClusterParameters），共 12 个真实 endpoint。
+
+**新接口（业务自治，非 14 接口骨架）**：
+- `cn.kuship.console.modules.misc.kubeblocks.api.KubeBlocksOperations`（13 method）
+- `KubeBlocksOperationsDefaultImpl`（throw UnsupportedOperationException 占位）
+- `KubeBlocksOperationsImpl`（`@Primary @Service`）—— 调 `clientFactory.getClient(rn, "")` + `RegionApiResponseProcessor`
+
+**Region URL 表（13 method）**：
+
+| method | HTTP | 路径 |
+|---|---|---|
+| listSupportedDatabases / listStorageClasses / listBackupRepos | GET | `/v2/cluster/kubeblocks/{supported-databases\|storage-classes\|backup-repos}` |
+| getClusterDetail / listClusterParameters / listClusterBackups / getClusterPodDetail | GET | `/v2/cluster/kubeblocks/clusters/{service_id}{/parameters\|/backups\|/pods/{pod_name}/details}` |
+| createCluster / expansionCluster / deleteCluster | POST/PUT/DELETE | `/v2/cluster/kubeblocks/clusters[/{service_id}]` |
+| createManualBackup / deleteClusterBackups | POST/DELETE | `/v2/cluster/kubeblocks/clusters/{service_id}/backups` |
+| updateBackupConfig | PUT | `/v2/cluster/kubeblocks/clusters/{service_id}/backup-schedules` |
+| updateClusterParameters | POST | `/v2/cluster/kubeblocks/clusters/{service_id}/parameters` |
+
+**Controller 路径前缀**：
+- `/console/teams/{team_name}/regions/{region_name}/kubeblocks/{supported_databases\|storage_classes\|backup_repos}`（snake_case 历史拼写）
+- `/console/teams/{team_name}/apps/{service_alias}/kubeblocks/{detail\|backup-config\|backups\|parameters\|restore}`
+
+**关键决策**：
+- 决策 4：`createCluster` / `deleteCluster` 仅落地 Operations method，**不暴露独立 controller endpoint**（rainbond 实际通过 `KubeBlocksComponentCreateView` 复合流程，留给 `add-kubeblocks-create-flow` hardening）
+- 决策 6：删除 `GET /backup-config`（rainbond 端无此 GET，UI 改用 `getDetail` bean 的 `backup_config` 字段）
+- 决策 7：保留 `restore` endpoint stub（INFO 日志 + TODO 注释指向 `add-kubeblocks-restore`）；`add-kubeblocks-restore` / `add-kubeblocks-cluster-events` / `add-kubeblocks-cluster-actions` / `add-kubeblocks-connect-info` 4 个 hardening change 在 `KubeBlocksOperations` 同接口上扩展 method
+
+**鉴权**：region-level GET 用 `@RequirePerm(TEAM_REGION_DESCRIBE)`；component-level 读用 `@RequirePerm(APP_OVERVIEW_DESCRIBE)`、写用 `@RequirePerm(APP_CREATE_PERMS)`。`PermCode` 实际包路径是 `cn.kuship.console.modules.account.perm.PermCode`（design.md 决策 5 笔误"`.constant.`"已修正）
+
+**14 接口骨架进度**：本 change 不影响 14 接口骨架计数，新接口位于 `modules/misc/kubeblocks/api/`
+
+### 应用分享 6-step 状态机 region 接线（migrate-console-app-share）
+
+`cn.kuship.console.modules.appmarket.share.api` 与 `modules.plugin.team.controller` 落地路线图 P1 #2 —— `ServiceShareController` / `PluginShareController` 内部 region 调用接线 + 2 个新 controller endpoint。
+
+**新接口**：`cn.kuship.console.modules.appmarket.share.api.ShareOperations`（7 method）+ `ShareOperationsImpl(@Primary)`
+
+**Region URL 表（7 method）**：
+
+| method | HTTP | 路径 | 锚点 |
+|---|---|---|---|
+| shareCloudService | POST | `/v2/tenants/{ns}/cloud-share` | `regionapi.py:975` |
+| shareService / getShareServiceResult | POST/GET | `/v2/tenants/{ns}/services/{alias}/share[/{region_share_id}]` | `regionapi.py:987,996` |
+| sharePlugin / getSharePluginResult | POST/GET | `/v2/tenants/{ns}/plugins/{plugin_id}/share[/{region_share_id}]` | `regionapi.py:1006,1015` |
+| getServicePublishStatus | GET | `/v2/builder/publish/service/{service_key}/version/{app_version}`（**唯一不带 namespace**） | `regionapi.py:1331` |
+| listAppReleases | GET | `/v2/tenants/{ns}/apps/{region_app_id}/releases` | `regionapi.py:2389` |
+
+**6-step 状态机 region 注入点**：
+
+| step | endpoint | region method |
+|---|---|---|
+| 0-2 | record / info | （无 region） |
+| 3 | POST `/share/{share_id}/events/{event_id}[/plugin]` | `shareService` / `sharePlugin` |
+| 4 | GET `/share/{share_id}/events/{event_id}/status`（轮询，本 change 新增） | `getShareServiceResult` / `getSharePluginResult` |
+| 5 | POST `/share/{share_id}/complete` | （无 region，仅校验全部 event_status=success） |
+
+**新增 controller endpoint**：
+- `ServiceShareController.eventStatus` GET `/share/{share_id}/events/{event_id}/status`
+- `PluginShareController.eventStatus` GET `/plugin-share/{share_id}/events/{event_id}/status`
+- `ServicePublishStatusController` GET `/console/teams/{team_name}/apps/{service_alias}/publish/status?service_key=&app_version=`
+- `AppReleasesController` GET `/console/teams/{team_name}/groups/{group_id}/releases`（`group_id` 是 `service_group.id` int PK；`region_app_id` 通过 `RegionAppRepository.findFirstByAppId(...)` 反查；缺失返 200 + 空 list）
+
+**事务边界**：`addEvent` 在 `@Transactional` 内，本地 INSERT event 行 → 调 region `shareService` → region 失败 Spring 自动回滚（删除已 INSERT event 行）；`event.regionShareId = bean.share_id`、`event.eventStatus = "start"`。`complete` 不调 region（rainbond fire-and-forget 模式）
+
+**新增 finder（共 3 个 repo 扩展）**：
+- `ServiceShareRecordEventRepository.findByRecordIdAndEventId`
+- `PluginShareRecordEventRepository.findByRecordIdAndEventId`
+- `RegionAppRepository.findFirstByAppId`
+
+**决策 2 边界**：`shareCloudService` 接口保留但 controller **不暴露**（UI v3.5+ 已移除入口，留给后续 marketplace OAuth 子 change 复用）；与 `migrate-console-app-import-export` 的 app_template 序列化解耦（本 change 不实现序列化）
+
+### 组件监控指标透传（migrate-console-monitor-extras）
+
+`cn.kuship.console.modules.appruntime` 落地路线图 P1 #3 —— `MonitorOperations` 既有 4 method 不动，扩 4 个 default unsupported method 由 `MonitorOperationsImpl @Primary` 实现；`AppMonitorController` 追加 3 个新 endpoint（`metrics` / `sortDomainQuery` / `sortServiceQuery`）。
+
+**新增 region method（接口暴露 4/8，加上既有 4 个共 8）**：
+
+| method | URL | 锚点 |
+|---|---|---|
+| getMonitorMetrics(rn, tenantId, target, appId, componentId) | `/v2/monitor/metrics?target=&tenant=&app=&component=`（**全局端点，不带 tenant 路径**） | `regionapi.py:2356` |
+| getResourceCenterEvents | `/v2/tenants/{tenantName}/resource-center/events?<sorted query>`（TreeMap 字典序 + URL encode） | `regionapi.py:3830` |
+| queryDomainAccess | `/api/v1/query?<query string>`（PromQL host 维度聚合） | `regionapi.py:1322` |
+| queryServiceAccess | `/api/v1/query?<query string>`（PromQL service 维度聚合） | `regionapi.py:1313` |
+
+**新增 controller endpoint（3 个，路径段保留 rainbond 单数 `/region/`）**：
+- `metrics` GET `/console/teams/{team_name}/apps/{service_alias}/metrics` —— controller 拿 `tenant.tenantId` + `service.serviceId` 调 `getMonitorMetrics(rn, tid, "component", "", sid)`
+- `sortDomainQuery` GET `/console/teams/{team_name}/region/{region_name}/sort_domain/query?page=&page_size=&repo=` —— PromQL `sort_desc(sum(ceil(increase(gateway_requests{namespace="<tid>"}[1h]))) by (host))`，客户端分页 + 累计 `total_traffic`，响应用 `GeneralMessage.okWithExtras(bean, paged, null)`（避免 advice 嵌套包装）
+- `sortServiceQuery` GET `/console/teams/{team_name}/region/{region_name}/sort_service/query` —— 两次 PromQL（outer `gateway_requests` by service / inner `app_request` by service_id）合并去重 top 10
+
+**新增 entity**：`cn.kuship.console.modules.appruntime.entity.ServiceMonitor`（`tenant_service_monitor` 表）+ `ServiceMonitorRepository`。**真实 schema 仅 8 列**（`ID` / `name` / `tenant_id` / `service_id` / `path` / `port` / `service_show_name` / `interval`），**无 `create_time` 列**（design.md 决策 2 笔误已修正）；`interval` 列名用 `@Column(name = "\`interval\`")` 反引号转义
+
+**实施期决策（路径冲突）**：design.md 决策 1 设计的 `resourceCenterEvents` endpoint（`/console/teams/{team_name}/regions/{region_name}/resource-center/events`）与既有 `ResourceCenterController`（`migrate-console-region-resource-center` 已落地）路径冲突，触发 Spring `Ambiguous mapping` 启动失败 → 删除 AppMonitorController 中的 endpoint，保留 `MonitorOperations.getResourceCenterEvents` 接口供后续 hardening 复用
+
+**14 接口骨架进度**：`MonitorOperations` 由 4/4 → 8/8（接口扩展 4 个 default method）；entity 新增 `ServiceMonitor`（rainbond `console/models/main.py:1086-1097` 锚点）
+
+### 构建版本与多语言版本管理（migrate-console-build-versions）
+
+`cn.kuship.console.modules.application` 落地路线图 P1 #4（最大子 change，15 method）—— `ServiceOperations` 在 7 既有 method 之后追加 9 个 default method 声明 + 由 `ServiceOperationsImpl @Primary` 内部追加 9 个 override；新增 2 个业务自治接口；新增 3 个 controller。
+
+**新增 region method（共 15）**：
+- `ServiceOperations` +9：`getBuildVersions` / `getBuildVersionById` / `updateBuildVersion` / `deleteBuildVersion` / `getServiceDeployVersion` / `getTeamServicesDeployVersion` / `serviceSourceCheck` / `getServiceCheckInfo` / `getBuildStatus`
+- `cn.kuship.console.modules.application.api.LangVersionOperations`（5 method）+ `LangVersionOperationsImpl @Primary`：getLangVersion / createLangVersion / updateLangVersion / deleteLangVersion / getCnbFrameworks
+- `cn.kuship.console.modules.application.api.BatchServiceOperations`（1 method）+ `BatchServiceOperationsImpl @Primary`：batchOperationService（带 `Resource-Validation: true` header）
+
+**新增 controller**：
+- `AppVersionsController`（8 endpoint）—— `/console/teams/{team_name}/apps/{service_alias}/{build-versions[/{version_id}] \| deploy-version \| source-check[/{uuid}] \| build-status}`；DELETE 时自动从 `RequestContext.username` 注入 `operator` 字段
+- `BatchDeployVersionController`（1 endpoint）—— POST `/console/teams/{team_name}/deploy-version` body `{service_ids: [...]}`，region_name 通过 `serviceRepo.findByServiceIdIn(...)` 反查或从 body 取
+- `LangVersionController`（5 endpoint）—— `/console/enterprise/{enterprise_id}/regions/{region_name}/{lang-version \| cnb/frameworks}`，全部 `@RequireEnterpriseAdmin`
+
+**实施期决策（schema 真相 + scope 推迟）**：
+- §2 entity 跳过：`docker exec mysql DESC service_build_version / lang_version` 实测两表**不存在**（仅 `plugin_build_version` / `service_build_source`），design.md 决策 2 / 决策 3 假设的 21 列 / 10 列 schema 与真实数据库不符 → `ServiceBuildVersion` / `LangVersion` entity 不创建，避免 `hibernate.ddl-auto=validate` 启动失败；本地缓存留给 hardening change `add-component-list-deploy-version-cache` / `add-lang-version-cache`
+- §7 改造 `AppBatchActionsController` 推迟：避免回归 lifecycle 单调度路径的风险（body 形状转换、`batch_result` 解析），独立 hardening 处理；本 change 仅落地 `BatchServiceOperations` 接口与 `@Primary` 实现，待后续接线
+
+**14 接口骨架进度**：`ServiceOperations` 由 7/7 → 16/16；新增 2 个业务自治接口（`LangVersionOperations` / `BatchServiceOperations`）位于 `modules/application/api/`，与 `BackupOperations`（appmarket）/ `MonitorOperations`（appruntime）/ `AutoscalerOperations`（appruntime）等同级
+
+**与 `migrate-console-maven-setting` 边界**：lang version 的所有权由本 change 持有；P2 maven-setting 子 change 仅在 maven 工具链配置上消费 lang version 数据，不重复落地
+
+### 灰度发布 region 通信收尾（migrate-console-grayrelease-finalize）
+
+`cn.kuship.console.modules.grayrelease.api` 落地路线图 P1 #5 —— `add-gray-release` 中 `GrayReleaseTemplateInstaller` 的 region 调用 stub 替换为真实 region 通信；`GrayReleaseService.updateGrayRatio` 双面同步（数据面 + 命令面）。
+
+**新接口**：`cn.kuship.console.modules.grayrelease.api.GrayReleaseOperations`（3 method）+ `GrayReleaseOperationsImpl(@Primary)`
+
+| method | HTTP | 路径 |
+|---|---|---|
+| createAppGrayRelease | POST | `/v2/tenants/{namespace}/apps/{regionAppId}/gray_release` |
+| updateAppGrayRelease | PUT | `/v2/tenants/{namespace}/apps/{regionAppId}/gray_release` |
+| operateAppGrayRelease | PUT | `/v2/tenants/{namespace}/apps/{regionAppId}/operate_gray_release?namespace=&app_id=&operation_method=`（当前已知 `operationMethod=rollback`） |
+
+**职责分层**（与既有 `ApisixRouteWeightUpdater` 协作）：
+
+| 职责 | 类 | 说明 |
+|---|---|---|
+| 数据面（流量切换） | `ApisixRouteWeightUpdater` | 调 rainbond-go core `/api-gateway/v1/.../routes/http` 改 backends weight |
+| 命令面（灰度对象同步） | `GrayReleaseOperations` | 调 region `gray_release` API 同步 `desired_replicas` / `strategy` |
+
+**`updateGrayRatio` 双面顺序**：先 `apisixUpdater.update(...)` 切流量（更紧急）→ 后 `grayReleaseOps.updateAppGrayRelease(...)` 同步 region 灰度对象（可容忍短暂滞后）
+
+**`installGrayServiceGroup` / `uninstallGrayServiceGroup` 签名扩展**：原 `(tenantId, appId, ...)` → 新 `(regionName, tenantName, tenantId, appId, regionAppId, ...)`；`uninstallGrayServiceGroup` 进一步加 `namespace` 参数。`GrayReleaseService` 同步改造调用点；`regionAppId` 临时复用 `appId`，TODO 注释指向 `migrate-console-app-install` 引入正式 `RegionApp` 映射
+
+**rollback 路径降级**：`uninstallGrayServiceGroup` 调 `operateAppGrayRelease(rollback)` 失败仅 WARN 不抛（与 `ApisixRouteWeightUpdater` rollback 失败对齐——record 已要写 CANCELLED，不能让用户 rollback 卡死）
+
+**新增配置项**：`kuship.gray-release.skip-region-template-install`（默认 `false`）—— `contract-test` profile 在 `application-contract-test.yaml` 默认设 `true` 让既有 `GrayReleaseIntegrationTest` 7 用例无破跑通；新增 `GrayReleaseOperationsImplTest` 6 单测验证 region 接线
+
+**仍 stub 范围（待 `migrate-console-app-install`）**：本地 `service_group` / `tenant_service` / `service_group_relation` 批量 INSERT 仍生成合成 id，WARN 日志文案改为 `[GrayRelease][stub] local service_group write bypassed; ... pending migrate-console-app-install`，与 region 调用 WARN 区分
+
+**未来 hardening 路径**：本 change 落地后，新端点（`add-grayrelease-promote-endpoint` / `add-grayrelease-lifecycle-endpoints`）直接复用 `GrayReleaseOperations.operateAppGrayRelease(... operationMethod=...)`，无需重复封装 region 通信层
+
 ## 测试约定
 
 - 集成测试用 `@SpringBootTest` + `@AutoConfigureMockMvc` + `@ActiveProfiles({"local","contract-test"})`，连本机真实 MySQL（与 application-local.yaml 一致），不读写业务表
@@ -973,6 +1580,67 @@ public class MyBusinessService {
 1. 是否已经走过 `migrate-console-response-contract`（全局响应/异常/JWT/TenantHeader 拦截器）
 2. 涉及 Region API 调用的，必须先走完 `migrate-console-region-client`
 3. 涉及 K8s 直连的（仅 rke2 模块），必须先走 `migrate-console-region-cluster`
+
+### Region API 覆盖度路线（migrate-region-coverage-roadmap）
+
+母路线图 [`migrate-region-coverage-roadmap`](../openspec/changes/archive/2026-05-11-migrate-region-coverage-roadmap/) 把 rainbond `www/apiclient/regionapi.py` 中剩余 ~153 个 region method 拆成 18 个聚焦子 change，按 P0 / P1 / P2 三段推进。本节是这张表在本仓内的常驻引用锚点；任何新 PR 在描述里只需写「实施 §X.Y」即可定位到具体子 change。
+
+> **状态**：2026-05-11 18 个子 change 全部 propose + apply + archive 闭环完成，母路线图同日自归档（main spec line 4753 起）。
+
+| 优先级 | 子 change                                | 估计 method | 状态 | 备注 |
+|--------|-------------------------------------------|------|------|------|
+| P0 #1 | `migrate-console-cluster-extras`            | 5    | ✅ 已落地 | 集群基础信息透传（line 964 起） |
+| P0 #2 | `migrate-console-gateway-domain`            | 29   | ✅ 已落地 | HTTP / TCP rule + api-gateway proxy（line 1312 起） |
+| P0 #3 | `migrate-console-gateway-certificate`       | 5    | ✅ 已落地 | 网关证书 CRUD（line 1078 起） |
+| P0 #4 | `migrate-console-cluster-nodes`             | 12   | ✅ 已落地 | 节点 action / label / taint（line 1171 起） |
+| P0 #5 | `migrate-console-resource-center`           | 10   | ✅ 已落地 | 资源中心 events / 监控（line 1264 起） |
+| P0 #6 | `migrate-console-volume-extras`             | 6    | ✅ 已落地 | 存储卷扩展（line 1033 起） |
+| P0 #7 | `migrate-console-dependency-extras`         | 3    | ✅ 已落地 | 批量依赖 + 旧版卷依赖（line 996 起） |
+| P0 #8 | `migrate-console-third-party-runtime`       | 6    | ✅ 已落地 | 第三方组件运行时（line 927 起） |
+| P1 #1 | `migrate-console-kubeblocks`                | 13   | ✅ 已落地 | KubeBlocks 数据库托管（line 1411 起） |
+| P1 #2 | `migrate-console-app-share`                 | 7    | ✅ 已落地 | 应用分享 6-step 状态机（line 1444 起） |
+| P1 #3 | `migrate-console-monitor-extras`            | 6    | ✅ 已落地 | 监控指标透传（line 1484 起） |
+| P1 #4 | `migrate-console-build-versions`            | 15   | ✅ 已落地 | 构建版本 + 多语言版本（line 1508 起） |
+| P1 #5 | `migrate-console-grayrelease-finalize`      | 3    | ✅ 已落地 | 灰度发布 region 收尾（line 1530 起） |
+| P2 #1 | `migrate-console-app-import-export`         | 22   | ✅ 已落地 | 应用 yaml import / export（line 4658 起） |
+| P2 #2 | `migrate-console-governance-policy`         | 12   | ✅ 已落地 | 治理策略 + k8s 属性（line 4586 起） |
+| P2 #3 | `migrate-console-maven-setting`             | 8    | ✅ 已落地 | maven 工具链配置（line 4533 起） |
+| P2 #4 | `migrate-console-service-labels`            | 4    | ✅ 已落地 | 组件 label CRUD（line 4422 起） |
+| P2 #5 | `migrate-console-backup-extras`             | 5    | ✅ 已落地 | backup-service 扩展（line 4472 起） |
+
+#### 关键依赖关系
+
+```
+P0 段（骨架先确立）
+  cluster-extras ──► cluster-nodes ──► service-labels (P2)
+  gateway-certificate ──► gateway-domain（证书是域名绑定的先决）
+  resource-center / volume-extras / dependency-extras / third-party-runtime（独立）
+
+P1 段（业务自治域，与 P0 解耦）
+  kubeblocks / app-share / monitor-extras / build-versions / grayrelease-finalize
+       │
+       ├── app-share 不实现 app_template 序列化 ──► 留给 P2 #1 app-import-export
+       ├── build-versions lang version 由本段持有 ──► 仅供 P2 #3 maven-setting 消费
+       └── grayrelease-finalize 本地 service_group 批量 INSERT 仍 stub ──► 待独立 hardening migrate-console-app-install
+
+P2 段（增强类，可在 P0/P1 完成后并行）
+  app-import-export / governance-policy / maven-setting / service-labels / backup-extras
+```
+
+#### 共享规约（所有 18 个子 change 强制遵守）
+
+- **聚焦原则**：每个子 change SHALL 覆盖一个 region API URL 前缀的子集，方法数 ≤ 30，可在 1-2 周内闭合
+- **接口位置**：14 接口骨架内的扩展放 `infrastructure/region/api/<X>Operations.java`；新业务域接口放 `modules/<domain>/api/<X>Operations.java`
+- **路径回归**：controller 路径与 rainbond `console/urls/__init__.py` 严格一致，trailing slash 兼容
+- **错误兜底**：region 异常透传 `msg_show`，缺失才走 `RegionErrorMsgEnricher`
+- **不打包**：跨 capability 的重构（region client / 全局响应包装 / mTLS 优化）不放入任何子 change，单独立 hardening
+- **Service Env 例外**：rainbond 历史选择本地为主 + 重启同步，本路线 SHALL NOT 迁移 `add_service_env` / `update_service_env` / `delete_service_env` 3 个 region method
+
+#### 子 change 落地的回环约束
+
+- 每个子 change 的 `design.md` 头部 SHALL 引用 `migrate-region-coverage-roadmap` 并标注自己在表中的位置（P0/P1/P2 + method 估计数）
+- 子 change 归档时 SHALL 反向更新母路线图 `tasks.md` 对应行（标 [x]）+ 在 `kuship-console/CLAUDE.md` 添加段落落点（按上表 line 锚点）
+- 实际 method 数与估计偏差 > 30% 时，子 change 的 `design.md` SHALL 解释偏差原因
 
 ## 与上层文档的关系
 

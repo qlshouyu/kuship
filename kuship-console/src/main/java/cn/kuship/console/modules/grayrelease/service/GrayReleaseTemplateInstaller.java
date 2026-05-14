@@ -1,28 +1,32 @@
 package cn.kuship.console.modules.grayrelease.service;
 
+import cn.kuship.console.modules.grayrelease.api.GrayReleaseOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
- * 灰度服务组实例化的 stub 实现。完整 "从模板批量创建组件 + 写 service_group_relation + 调 region createService"
- * 的流程依赖未迁移的 {@code AppInstallService}（rainbond Python {@code market_app_service.install_app}），
- * 由后续 {@code migrate-console-app-install} change 落地。
+ * 灰度服务组实例化的 stub + region 接线（migrate-console-grayrelease-finalize）。
  *
- * <p>当前 stub 行为：
+ * <p>本 change 在原 stub 之上追加 region 调用：{@code installGrayServiceGroup} 调
+ * {@link GrayReleaseOperations#createAppGrayRelease} 让 region 端 desired_replicas / strategy
+ * 与本地 record 同步；{@code uninstallGrayServiceGroup} 调 {@code operateAppGrayRelease(rollback)}
+ * 通知 region 解除灰度对象。
+ *
+ * <p>仍 stub 范围（待 {@code migrate-console-app-install} 落地）：
  * <ul>
- *   <li>生成 32-char 合成 service_id（uniqueness 上没冲突）</li>
- *   <li>生成 6 位随机 upgrade_group_id（int 范围内）</li>
- *   <li>记录 WARN 日志告知调用方 stub 行为</li>
- *   <li>不调 region createService，不写 tenant_service / service_group_relation</li>
+ *   <li>本地 service_group / tenant_service / service_group_relation 批量 INSERT 仍是合成 id</li>
+ *   <li>region 端真实 service_id 来自 {@code createAppGrayRelease} 响应；缺失时 fallback 合成 id</li>
  * </ul>
  *
- * <p>由此 stub 创建的"灰度 service"在 ApisixRoute 权重更新时不会有真实后端 endpoint；
- * 在 rainbond-go core 真实集群中应表现为 ApisixRoute 4xx（service not found）。集成测试通过
- * mock {@code GatewayOperations} 隔离这层依赖。
+ * <p>降级阀 {@code kuship.gray-release.skip-region-template-install=true} 时回退到
+ * {@code add-gray-release} 原始合成 id 行为，便于无 region 集成测试。
  */
 @Component
 public class GrayReleaseTemplateInstaller {
@@ -31,34 +35,88 @@ public class GrayReleaseTemplateInstaller {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    /**
-     * @return 包含 grayServiceId / grayServiceCname / grayUpgradeGroupId / originalServiceId
-     *         / originalServiceCname / originalUpgradeGroupId 的简化结果。
-     */
-    public Result installGrayServiceGroup(String tenantId, Integer appId, String templateId, String version,
-                                            String marketName, boolean installFromCloud) {
-        String grayServiceId = randomServiceId();
-        String origServiceId = randomServiceId();
-        Integer grayUpgradeGroupId = RANDOM.nextInt(900_000) + 100_000;
-        Integer origUpgradeGroupId = RANDOM.nextInt(900_000) + 100_000;
-        log.warn("[GrayRelease][stub] template install bypassed; tenant={} app={} template={} version={} cloud={}; "
-                + "synthetic ids gray_svc={} orig_svc={}; pending migrate-console-app-install",
-                tenantId, appId, templateId, version, installFromCloud,
-                grayServiceId, origServiceId);
-        return new Result(origServiceId, "original",
-                grayServiceId, "gray-" + (templateId == null ? "v1" : templateId),
-                origUpgradeGroupId, grayUpgradeGroupId);
+    private final GrayReleaseOperations grayReleaseOps;
+    private final boolean skipRegionTemplateInstall;
+
+    public GrayReleaseTemplateInstaller(GrayReleaseOperations grayReleaseOps,
+                                          @Value("${kuship.gray-release.skip-region-template-install:false}")
+                                          boolean skipRegionTemplateInstall) {
+        this.grayReleaseOps = grayReleaseOps;
+        this.skipRegionTemplateInstall = skipRegionTemplateInstall;
     }
 
-    public void uninstallGrayServiceGroup(String tenantId, Integer appId, Integer grayUpgradeGroupId) {
-        log.warn("[GrayRelease][stub] template uninstall bypassed; tenant={} app={} upgrade_group={}; "
+    public Result installGrayServiceGroup(String regionName, String tenantName, String tenantId,
+                                            Integer appId, Integer regionAppId,
+                                            String templateId, String version,
+                                            String marketName, boolean installFromCloud) {
+        // 合成 id 兜底（region 响应字段缺失时使用，与 add-gray-release 既定行为一致）
+        String synGray = randomServiceId();
+        String synOrig = randomServiceId();
+        Integer synGrayUg = RANDOM.nextInt(900_000) + 100_000;
+        Integer synOrigUg = RANDOM.nextInt(900_000) + 100_000;
+        log.warn("[GrayRelease][stub] local service_group write bypassed; tenant={} app={} template={} version={} "
+                + "cloud={}; synthetic ids gray_svc={} orig_svc={}; pending migrate-console-app-install",
+                tenantId, appId, templateId, version, installFromCloud, synGray, synOrig);
+
+        if (skipRegionTemplateInstall) {
+            return new Result(synOrig, "original", synGray, "gray-" + (templateId == null ? "v1" : templateId),
+                    synOrigUg, synGrayUg);
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("template_id", templateId == null ? "" : templateId);
+        body.put("version", version == null ? "" : version);
+        body.put("market_name", marketName == null ? "" : marketName);
+        body.put("install_from_cloud", installFromCloud);
+        body.put("gray_ratio", 0); // 由 caller 后续在 ApisixRouteWeightUpdater 里切
+
+        Map<String, Object> resp = grayReleaseOps.createAppGrayRelease(regionName, tenantName,
+                regionAppId == null ? appId : regionAppId, body);
+
+        String origServiceId = stringOr(resp.get("original_service_id"), synOrig);
+        String grayServiceId = stringOr(resp.get("gray_service_id"), synGray);
+        Integer origUg = intOr(resp.get("original_upgrade_group_id"), synOrigUg);
+        Integer grayUg = intOr(resp.get("gray_upgrade_group_id"), synGrayUg);
+
+        return new Result(origServiceId, "original",
+                grayServiceId, "gray-" + (templateId == null ? "v1" : templateId),
+                origUg, grayUg);
+    }
+
+    public void uninstallGrayServiceGroup(String regionName, String tenantName, String tenantId,
+                                             Integer appId, Integer regionAppId,
+                                             String namespace, Integer grayUpgradeGroupId) {
+        log.warn("[GrayRelease][stub] local service_group cleanup bypassed; tenant={} app={} upgrade_group={}; "
                 + "pending migrate-console-app-install", tenantId, appId, grayUpgradeGroupId);
+
+        if (skipRegionTemplateInstall) {
+            return;
+        }
+
+        try {
+            grayReleaseOps.operateAppGrayRelease(regionName, tenantName,
+                    regionAppId == null ? appId : regionAppId, namespace, "rollback");
+        } catch (RuntimeException e) {
+            log.warn("[GrayRelease] rollback region operate failed for app {}; cause={}", appId, e.getMessage());
+        }
     }
 
     private static String randomServiceId() {
         byte[] buf = new byte[16];
         RANDOM.nextBytes(buf);
         return HexFormat.of().formatHex(buf);
+    }
+
+    private static String stringOr(Object value, String fallback) {
+        return value instanceof String s && !s.isBlank() ? s : fallback;
+    }
+
+    private static Integer intOr(Object value, Integer fallback) {
+        if (value instanceof Number n) return n.intValue();
+        if (value instanceof String s && !s.isBlank()) {
+            try { return Integer.parseInt(s); } catch (NumberFormatException ignore) {}
+        }
+        return fallback;
     }
 
     public record Result(

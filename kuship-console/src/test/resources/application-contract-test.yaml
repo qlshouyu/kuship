@@ -6,3 +6,7 @@ kuship:
   openapi:
     docs:
       enabled: true
+  # migrate-console-grayrelease-finalize：默认跳过 region 调用，让既有 GrayReleaseIntegrationTest 不破。
+  # 新测试 GrayReleaseFinalizeIntegrationTest 通过 @SpringBootTest properties 覆盖为 false 验证 region 接线。
+  gray-release:
+    skip-region-template-install: true
