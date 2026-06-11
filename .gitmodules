@@ -7,3 +7,6 @@
 [submodule "reference/rainbond-chart"]
 	path = reference/rainbond-chart
 	url = git@github.com:goodrain/rainbond-chart.git
+[submodule "reference/rainbond"]
+	path = reference/rainbond
+	url = https://github.com/goodrain/rainbond.git

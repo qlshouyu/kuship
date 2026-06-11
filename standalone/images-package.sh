@@ -112,7 +112,9 @@ echo "==> fetching k3s-images.txt from: ${IMAGES_TXT_URL}"
 TMP_LIST="$(mktemp -t k3s-images.XXXXXX)"
 trap 'rm -f "${TMP_LIST}"' EXIT INT TERM
 
-if ! curl --fail --location --retry 3 --retry-delay 5 --silent --show-error \
+# --retry-all-errors：代理对 GitHub CDN 的 SSL 握手会随机中断（SSL_ERROR_SYSCALL / curl 35），
+# 默认 --retry 不重试这类连接错误，需显式开启才能在弱网/代理下稳定拉到清单
+if ! curl --fail --location --retry 20 --retry-delay 2 --retry-all-errors --silent --show-error \
         -o "${TMP_LIST}" "${IMAGES_TXT_URL}"; then
     echo "ERROR: 无法获取 k3s-images.txt: ${IMAGES_TXT_URL}" >&2
     echo "       请检查网络是否可达 github.com，或通过 K3S_IMAGES_TXT_URL 指定可达的内网镜像源" >&2

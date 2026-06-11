@@ -1,7 +1,7 @@
 # kuship 本地开发栈 docker-compose 编排
 #
 # 说明：
-#   - rainbond 服务使用的镜像 `rainbond-dev:v6.7.1-release` 由仓库根目录下的
+#   - rainbond 服务使用的镜像 `rainbond-dev:v6.9.0-release` 由仓库根目录下的
 #     `standalone_build.sh` 通过 `standalone/Dockerfile` 构建产出。
 #   - 首次启动前，请先在仓库根目录执行 `./standalone_build.sh`，确保
 #     `k3s-images-<arch>.tar.zst` 离线镜像包已就位（compose 自带的 `build`
@@ -45,17 +45,17 @@ services:
         ipv4_address: 172.20.0.10
 
   rainbond:
-    image: rainbond-dev:v6.7.1-release
+    image: registry.cn-hangzhou.aliyuncs.com/egojit/rainbond-dev:v6.9.0-release
     build:
       context: ..
       dockerfile: standalone/Dockerfile
       args:
-        VERSION: v6.7.1-release
+        VERSION: v6.9.0-release
     container_name: kuship-rainbond
     restart: unless-stopped
     privileged: true
     environment:
-      VERSION: v6.7.1-release
+      VERSION: v6.9.0-release
       DB_HOST: 172.20.0.10
       DB_PORT: "3306"
       DB_USER: root
@@ -78,14 +78,12 @@ services:
     volumes:
       - rainbond-data:/opt/rainbond
       - ../rainbond-images-${ARCH:-arm64}.tar.zst:/tmp/rainbond-images.tar.zst:ro
-
 networks:
   default:
     ipam:
       driver: default
       config:
         - subnet: 172.20.0.0/16
-
 volumes:
   mysql-data:
   rainbond-data:

@@ -118,7 +118,7 @@ spec:
       - name: node
         internalIP: $GET_EIP
         externalIP: $GET_EIP
-      installVersion: ${VERSION:-v6.7.1-dev}
+      installVersion: ${VERSION:-v6.9.0-release}
       eid: ${UUID}
       regionDatabase:
         enable: ${DB_REGION_ENABLE:-true}

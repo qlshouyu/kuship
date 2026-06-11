@@ -1,5 +1,10 @@
 *.tar.zst
 
+# 宿主机预下载的 k3s 二进制（构建产物，不入库），由 standalone_build.sh 生成
+/k3s-amd64
+/k3s-arm64
+/k3s-arm-v7
+
 # kuship-console build artifacts and local-only Spring profile
 kuship-console/target/
 kuship-console/**/application-local.yaml

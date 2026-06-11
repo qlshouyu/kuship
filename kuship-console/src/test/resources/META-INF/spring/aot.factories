@@ -1,2 +1,0 @@
-org.springframework.aot.hint.RuntimeHintsRegistrar=\
-cn.kuship.console.native_.NativeTestRuntimeHintsRegistrar

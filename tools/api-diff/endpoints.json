@@ -1,0 +1,29 @@
+{
+  "_comment": "kuship vs rainbond 接口响应对比清单。占位符在 context 段定义，path 中用 {name} 引用。新增端点改这里即可，不动 Python。",
+  "context": {
+    "team_name": "default",
+    "region_name": "rainbond",
+    "group_id": "6",
+    "app_id": "6"
+  },
+  "endpoints": [
+    { "id": "team-arch",            "method": "GET", "path": "/console/teams/{team_name}/arch?region_name={region_name}" },
+    { "id": "team-apps",            "method": "GET", "path": "/console/teams/{team_name}/apps?region_name={region_name}&page=1&page_size=10" },
+    { "id": "team-groups-list",     "method": "GET", "path": "/console/teams/{team_name}/groups?region_name={region_name}" },
+    { "id": "team-region-query",    "method": "GET", "path": "/console/teams/{team_name}/region/query" },
+    { "id": "team-protocols",       "method": "GET", "path": "/console/teams/{team_name}/protocols?region_name={region_name}" },
+    { "id": "team-overview-groups", "method": "GET", "path": "/console/teams/{team_name}/overview/groups?region_name={region_name}" },
+    { "id": "group-detail",         "method": "GET", "path": "/console/teams/{team_name}/groups/{app_id}" },
+    { "id": "group-status",         "method": "GET", "path": "/console/teams/{team_name}/groups/{app_id}/status",
+      "expected_diffs": ["data.list shape: rb=dict kp=list"] },
+    { "id": "group-component-names","method": "GET", "path": "/console/teams/{team_name}/groups/{app_id}/component_names" },
+    { "id": "group-governancemode", "method": "GET", "path": "/console/teams/{team_name}/groups/{app_id}/governancemode" },
+    { "id": "topological",          "method": "GET", "path": "/console/teams/{team_name}/regions/{region_name}/topological?group_id={group_id}" },
+    { "id": "operator-managed",     "method": "GET", "path": "/console/teams/{team_name}/operator-managed?group_id={group_id}",
+      "expected_diffs": ["data.bean only-in-kuship keys: ['service']", "data.list shape: rb=dict kp=list"] },
+    { "id": "service-group",        "method": "GET", "path": "/console/teams/{team_name}/service/group?group_id={group_id}&page=1&page_size=100" },
+    { "id": "upgradable-num",       "method": "GET", "path": "/console/teams/{team_name}/groups/{app_id}/upgradable_num" },
+    { "id": "handle",               "method": "GET", "path": "/console/teams/{team_name}/groups/{app_id}/handle" },
+    { "id": "storage-statistics",   "method": "GET", "path": "/console/storage_statistics?region_name={region_name}" }
+  ]
+}

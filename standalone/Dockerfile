@@ -9,14 +9,6 @@ ARG NO_PROXY
 ARG no_proxy
 WORKDIR /tmp
 
-RUN apk add --no-cache wget && \
-    if [ -z "${K3S_VERSION}" ]; then echo "ERROR: K3S_VERSION build-arg not set"; exit 1; fi && \
-    encoded_version="$(echo "${K3S_VERSION}" | sed 's/+/%2B/g')" && \
-    if [ "$TARGETARCH" = "amd64" ]; then \
-      wget "https://github.com/k3s-io/k3s/releases/download/${encoded_version}/k3s" -O /tmp/k3s && chmod +x /tmp/k3s; \
-    else \
-      wget "https://github.com/k3s-io/k3s/releases/download/${encoded_version}/k3s-arm64" -O /tmp/k3s && chmod +x /tmp/k3s; \
-    fi
 COPY reference/rainbond-chart /tmp/rainbond-chart
 RUN  helm package rainbond-chart && \
     mv rainbond-*.tgz rainbond-cluster.tgz
@@ -38,7 +30,10 @@ COPY standalone/registries.yaml /etc/rancher/k3s/registries.yaml
 COPY k3s-images-$TARGETARCH.tar.zst /tmp/k3s-images.tar.zst
 
 COPY --from=base /tmp/rainbond-cluster.tgz /tmp/rainbond-cluster.tgz
-COPY --from=base /tmp/k3s /bin/k3s
+# k3s 二进制由 standalone_build.sh 在宿主机预下载（curl 续传+重试，规避代理对 GitHub
+# CDN 大文件的随机断流），命名为 k3s-<arch> 后直接 COPY，避免构建期联网下载。
+COPY k3s-$TARGETARCH /bin/k3s
+RUN chmod +x /bin/k3s
 
 # apt 走国内 mirror 直连（不走代理），其它阶段的 wget 仍可通过 ARG HTTP_PROXY 走代理
 # ca-certificates 只在 main 仓库，关掉 universe/multiverse/restricted 可显著降低

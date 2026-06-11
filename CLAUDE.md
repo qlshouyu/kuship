@@ -32,12 +32,7 @@ kuship/
 │   ├── config-agent.yaml        # RKE2 agent 配置（server / token 由 install 脚本注入）
 │   └── registries.yaml          # containerd 镜像仓库配置（goodrain.me）
 │
-├── openspec/                    # OpenSpec 规范与变更管理
-│   ├── config.yaml              # OpenSpec 配置
-│   ├── specs/                   # 已归档的能力规范
-│   └── changes/                 # 进行中的变更提案
-│
-├── reference/                   # 参考代码（git submodule，只读）
+├── reference/                   # Rainbond 参考代码（git submodule，只读）
 │   ├── rainbond-console/        # Rainbond 控制台后端（参考实现）
 │   ├── rainbond-ui/             # Rainbond 控制台前端
 │   └── rainbond-chart/          # Rainbond Helm Chart（含 CRD 与模板）
@@ -54,3 +49,4 @@ kuship/
 ```
 ## 其它
 - 老项目rainbond管理控制台启动地址http://localhost:7070/，新项目kuship的管理控制台启动地址http://localhost:8000/,解决kuship问题时可以参考老项目rainbond
+- 请使用中文
