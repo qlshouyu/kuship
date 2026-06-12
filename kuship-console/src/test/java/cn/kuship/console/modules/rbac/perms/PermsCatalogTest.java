@@ -115,4 +115,55 @@ class PermsCatalogTest {
     private static List<String> leafNames(List<Map<String, Boolean>> leaves) {
         return leaves.stream().map(m -> m.keySet().iterator().next()).collect(Collectors.toList());
     }
+
+    @Test
+    void perms_name_code_kv_maps_team_and_enterprise() {
+        Map<String, Integer> kv = PermsCatalog.getPermsNameCodeKv();
+        assertThat(kv).containsEntry("team_overview_describe", 200001);
+        assertThat(kv).containsEntry("team_overview_app_list", 200002);
+        assertThat(kv).containsEntry("team_role_create", 630002);
+        assertThat(kv).containsEntry("admin_enterprise_info", 100000); // 企业侧
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void perms_structure_matches_7070_shape() {
+        Map<String, Object> s = PermsCatalog.getPermsStructure();
+        assertThat(s).containsOnlyKeys("team", "enterprise");
+        Map<String, Object> team = (Map<String, Object>) s.get("team");
+        assertThat((List<Object>) team.get("sub_models")).hasSize(6);
+        assertThat((List<Object>) team.get("perms")).isEmpty();
+        // 叶子为 name/desc/code 形态
+        List<Object> subs = (List<Object>) team.get("sub_models");
+        Map<String, Object> overview = (Map<String, Object>) ((Map<String, Object>) subs.get(0)).get("team_overview");
+        Map<String, Object> leaf0 = (Map<String, Object>) ((List<Object>) overview.get("perms")).get(0);
+        assertThat(leaf0).containsEntry("name", "describe").containsEntry("code", 200001);
+        assertThat(leaf0).containsKey("desc");
+        // team_app_manage 空（sub_models:[], perms:[]）
+        Map<String, Object> am = (Map<String, Object>) ((Map<String, Object>) subs.get(2)).get("team_app_manage");
+        assertThat((List<Object>) am.get("sub_models")).isEmpty();
+        assertThat((List<Object>) am.get("perms")).isEmpty();
+        // enterprise 2 子模型
+        Map<String, Object> ent = (Map<String, Object>) s.get("enterprise");
+        assertThat((List<Object>) ent.get("sub_models")).hasSize(2);
+    }
+
+    @Test
+    void unpack_roundtrip_with_pack() {
+        // owner 全 true 树 → 降维应含全部团队码（与 allTeamPermCodes 同集，去重）
+        Map<String, Object> tree = PermsCatalog.packRolePermsTree("team", PermsCatalog.team(), Set.of(), true);
+        List<PermsCatalog.RolePermCode> codes = PermsCatalog.unpackRolePermsTree(tree);
+        Set<Integer> got = codes.stream().map(PermsCatalog.RolePermCode::code).collect(java.util.stream.Collectors.toSet());
+        assertThat(got).isEqualTo(PermsCatalog.allTeamPermCodes());
+        assertThat(codes).allMatch(c -> c.appId() == -1); // 无 app 节点 → 全局
+    }
+
+    @Test
+    void unpack_single_true_leaf() {
+        Map<String, Object> tree = PermsCatalog.packRolePermsTree("team", PermsCatalog.team(), Set.of(200001), false);
+        List<PermsCatalog.RolePermCode> codes = PermsCatalog.unpackRolePermsTree(tree);
+        assertThat(codes).hasSize(1);
+        assertThat(codes.get(0).code()).isEqualTo(200001);
+        assertThat(codes.get(0).appId()).isEqualTo(-1);
+    }
 }

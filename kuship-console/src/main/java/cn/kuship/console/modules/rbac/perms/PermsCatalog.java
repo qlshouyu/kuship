@@ -373,4 +373,141 @@ public final class PermsCatalog {
         out.addAll(commonPermCodes());
         return out;
     }
+
+    // ---- 写支撑：名↔码映射、权限元数据树、权限树降维（perms.py get_perms_name_code_kv / get_structure / unpack）----
+
+    /** 企业模板的节点形态（perms.py {@code ENTERPRISE} 包成 {@code {perms:[], admin:{perms}, app_store:{perms}}}）。 */
+    public static Map<String, Object> enterprise() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("perms", List.<Perm>of());
+        for (Map.Entry<String, List<Perm>> e : ENTERPRISE.entrySet()) {
+            m.put(e.getKey(), node(e.getValue()));
+        }
+        return m;
+    }
+
+    /**
+     * {@code 分组名_权限名 → 整型码} 映射（对齐 {@code get_perms_name_code_kv}）。
+     * 名称口径同 {@link #getPerms}（直接父分组名前缀），供 {@link #unpackRolePermsTree} 名→码。
+     */
+    public static Map<String, Integer> getPermsNameCodeKv() {
+        Map<String, Integer> kv = new LinkedHashMap<>();
+        for (AssembledPerm p : allTeamAndEnterprisePerms()) {
+            kv.put(p.name(), p.code());
+        }
+        return kv;
+    }
+
+    /**
+     * 权限元数据树（对齐 {@code get_structure}）：{@code {kindName: {sub_models:[...], perms:[{name,desc,code}]}}}。
+     * 叶子为 name/desc/code（区别于 packRolePermsTree 的布尔叶子）。
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> getStructure(String kindName, Map<String, Object> template) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        List<Object> subModels = new ArrayList<>();
+        for (Map.Entry<String, Object> e : template.entrySet()) {
+            if (e.getKey().equals("perms")) {
+                continue;
+            }
+            subModels.add(getStructure(e.getKey(), (Map<String, Object>) e.getValue()));
+        }
+        body.put("sub_models", subModels);
+        List<Map<String, Object>> leaves = new ArrayList<>();
+        for (Perm perm : (List<Perm>) template.get("perms")) {
+            Map<String, Object> leaf = new LinkedHashMap<>();
+            leaf.put("name", perm.name());
+            leaf.put("desc", perm.desc());
+            leaf.put("code", perm.code());
+            leaves.add(leaf);
+        }
+        body.put("perms", leaves);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put(kindName, body);
+        return out;
+    }
+
+    /**
+     * 权限元数据完整树（对齐 {@code get_perms_structure}）：{@code {team:{...}, enterprise:{...}}}。
+     * {@code team_app_manage} 按团队应用列表重建——kuship 无应用域 → {@code {sub_models:[], perms:[]}}。
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> getPermsStructure() {
+        Map<String, Object> out = new LinkedHashMap<>();
+        Map<String, Object> team = getStructure("team", team());
+        // team_app_manage（sub_models[2]）按应用重建；无应用 → 空 {sub_models:[], perms:[]}
+        List<Object> subs = (List<Object>) ((Map<String, Object>) team.get("team")).get("sub_models");
+        for (Object sub : subs) {
+            Map<String, Object> subMap = (Map<String, Object>) sub;
+            if (subMap.containsKey("team_app_manage")) {
+                Map<String, Object> empty = new LinkedHashMap<>();
+                empty.put("sub_models", new ArrayList<>());
+                empty.put("perms", new ArrayList<>());
+                subMap.put("team_app_manage", empty);
+                break;
+            }
+        }
+        out.put("team", team.get("team"));
+        out.put("enterprise", getStructure("enterprise", enterprise()).get("enterprise"));
+        return out;
+    }
+
+    /** 降维结果的一项：权限码 + 应用 id（全局为 -1）。 */
+    public record RolePermCode(int code, int appId) {
+    }
+
+    /**
+     * 权限树降维（对齐 {@code unpack_role_perms_tree} / {@code __unpack_to_build_perms_list}）：
+     * 遍历提交的 {@code {kind:{sub_models,perms}}} 树，对每个为 {@code true} 的叶子按
+     * {@code 节点名_权限名 → 码} 取码；{@code app_<id>} 节点解析 appId，否则继承（默认 -1）。
+     * 未知键（catalog 无对应码）跳过。
+     */
+    public static List<RolePermCode> unpackRolePermsTree(Map<String, Object> permsTree) {
+        Map<String, Integer> kv = getPermsNameCodeKv();
+        List<RolePermCode> out = new ArrayList<>();
+        for (Map.Entry<String, Object> e : permsTree.entrySet()) {
+            unpackNode(e.getKey(), e.getValue(), kv, -1, out);
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void unpackNode(String kindName, Object nodeObj, Map<String, Integer> kv, int appId,
+                                   List<RolePermCode> out) {
+        if (!(nodeObj instanceof Map<?, ?> node)) {
+            return;
+        }
+        int currentApp = appId;
+        if (kindName.startsWith("app_")) {
+            String suffix = kindName.substring("app_".length());
+            if (suffix.chars().allMatch(Character::isDigit) && !suffix.isEmpty()) {
+                currentApp = Integer.parseInt(suffix);
+            }
+        }
+        Object subModels = node.get("sub_models");
+        if (subModels instanceof List<?> subs) {
+            for (Object sub : subs) {
+                if (sub instanceof Map<?, ?> subMap) {
+                    for (Map.Entry<?, ?> se : subMap.entrySet()) {
+                        unpackNode((String) se.getKey(), se.getValue(), kv, currentApp, out);
+                    }
+                }
+            }
+        }
+        Object perms = node.get("perms");
+        if (perms instanceof List<?> leaves) {
+            for (Object leaf : leaves) {
+                if (leaf instanceof Map<?, ?> leafMap) {
+                    for (Map.Entry<?, ?> le : leafMap.entrySet()) {
+                        if (Boolean.TRUE.equals(le.getValue())) {
+                            Integer code = kv.get(kindName + "_" + le.getKey());
+                            if (code != null) {
+                                out.add(new RolePermCode(code, currentApp));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
