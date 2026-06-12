@@ -35,6 +35,26 @@ fi
 echo "==> resolving k3s version: ${K3S_VERSION}"
 
 ########################################
+# 1b. 加载镜像源覆盖表（可选，见 k3s-image-mirrors.env）
+########################################
+MIRRORS_ENV="${SCRIPT_DIR}/k3s-image-mirrors.env"
+K3S_IMAGE_MIRRORS=""
+if [ -f "${MIRRORS_ENV}" ]; then
+    # shellcheck disable=SC1090
+    . "${MIRRORS_ENV}"
+    if [ -n "${K3S_IMAGE_MIRRORS:-}" ]; then
+        MIRROR_COUNT="$(echo "${K3S_IMAGE_MIRRORS}" | awk 'NF>=2 && $1 !~ /^#/ {c++} END{print c+0}')"
+        echo "==> loaded ${MIRROR_COUNT} image mirror override(s) from $(basename "${MIRRORS_ENV}")"
+    fi
+fi
+
+# 在覆盖表中查找某原始镜像对应的镜像源；无匹配返回空串
+mirror_source_for() {
+    [ -z "${K3S_IMAGE_MIRRORS:-}" ] && return 0
+    echo "${K3S_IMAGE_MIRRORS}" | awk -v t="$1" 'NF>=2 && $1==t {print $2; exit}'
+}
+
+########################################
 # 2. 检测架构
 ########################################
 if [ -z "${ARCH:-}" ]; then
@@ -63,6 +83,15 @@ require_cmd docker "请安装并启动 Docker / Docker Desktop"
 if ! docker info >/dev/null 2>&1; then
     echo "ERROR: docker daemon 不可用，请确认 Docker Desktop 已启动" >&2
     exit 1
+fi
+
+# Docker Desktop 启用「containerd 镜像存储」时，docker save 对多架构镜像会丢层，
+# 产出的离线 tar 不完整（导入后 kubelet 仍会在线拉取并失败）。建议在普通镜像存储的
+# Docker（如 Linux，overlay2）上打包，或关闭 Docker Desktop 设置中的
+# “Use containerd for pulling and storing images”。
+if docker info --format '{{.DriverStatus}}' 2>/dev/null | grep -q "io.containerd.snapshotter"; then
+    echo "WARNING: 检测到 Docker 使用 containerd 镜像存储，docker save 可能产出不完整的离线包；" >&2
+    echo "         建议改用普通镜像存储的 Docker 打包，或关闭 Docker Desktop 的 containerd 镜像存储。" >&2
 fi
 
 install_zstd() {
@@ -132,13 +161,24 @@ IMAGE_COUNT="$(printf '%s\n' "${IMAGE_LIST}" | wc -l | tr -d ' ')"
 echo "==> pulling ${IMAGE_COUNT} images for ${ARCH}"
 
 ########################################
-# 5. 拉取镜像
+# 5. 拉取镜像（命中覆盖表的从镜像源拉取并改回原始名字）
 ########################################
 for image in ${IMAGE_LIST}; do
-    echo "    -> docker pull --platform=${ARCH} ${image}"
-    if ! docker pull --platform="${ARCH}" "${image}"; then
-        echo "ERROR: 拉取失败：${image}" >&2
-        exit 1
+    src="$(mirror_source_for "${image}")"
+    if [ -n "${src}" ]; then
+        echo "    -> [mirror] docker pull --platform=${ARCH} ${src}  (retag → ${image})"
+        if ! docker pull --platform="${ARCH}" "${src}"; then
+            echo "ERROR: 镜像源拉取失败：${src}（覆盖 ${image}）" >&2
+            exit 1
+        fi
+        # 改回 k3s 期望的原始名字：离线包内必须是原始名，kubelet 才能按 deployment 引用命中本地镜像
+        docker tag "${src}" "${image}"
+    else
+        echo "    -> docker pull --platform=${ARCH} ${image}"
+        if ! docker pull --platform="${ARCH}" "${image}"; then
+            echo "ERROR: 拉取失败：${image}" >&2
+            exit 1
+        fi
     fi
 done
 
