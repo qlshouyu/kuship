@@ -119,6 +119,10 @@ public class RegionConfig {
         return status;
     }
 
+    public java.time.LocalDateTime getCreateTime() {
+        return createTime;
+    }
+
     public String getSslCaCert() {
         return sslCaCert;
     }

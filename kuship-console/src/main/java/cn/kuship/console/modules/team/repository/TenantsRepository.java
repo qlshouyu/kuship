@@ -15,4 +15,6 @@ public interface TenantsRepository extends JpaRepository<Tenants, Integer> {
     List<Tenants> findByEnterpriseId(String enterpriseId);
 
     List<Tenants> findByIdIn(List<Integer> ids);
+
+    long countByEnterpriseId(String enterpriseId);
 }

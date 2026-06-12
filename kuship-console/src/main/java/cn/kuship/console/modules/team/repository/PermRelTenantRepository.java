@@ -8,4 +8,6 @@ import java.util.List;
 public interface PermRelTenantRepository extends JpaRepository<PermRelTenant, Integer> {
 
     List<PermRelTenant> findByUserId(Integer userId);
+
+    long countByTenantId(Integer tenantId);
 }

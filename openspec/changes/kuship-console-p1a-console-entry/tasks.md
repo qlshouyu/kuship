@@ -17,29 +17,29 @@
 
 ## 3. account：当前用户详情（account-profile）
 
-- [ ] 3.1 `GET /console/users/details`：从 RequestContext.currentUser 组装 bean（user_id/nick_name/email/enterprise_id 等）
-- [ ] 3.2 与 7070 对照补齐 bean 字段集与命名
+- [x] 3.1 `GET /console/users/details`：从 RequestContext.currentUser 组装 bean（user_id/nick_name/email/enterprise_id 等）
+- [x] 3.2 与 7070 对照补齐 bean 字段集与命名
 
 ## 4. enterprise 读路径（enterprise-read）
 
-- [ ] 4.1 `GET /console/enterprises`：返回当前用户企业（形态/字段对照 7070）
-- [ ] 4.2 `GET /console/enterprise/{enterprise_id}/overview`：企业概览基础字段（重聚合 TODO 标注）；越权企业按 7070 拒绝
+- [x] 4.1 `GET /console/enterprises`：返回当前用户企业（形态/字段对照 7070）
+- [x] 4.2 `GET /console/enterprise/{enterprise_id}/overview`：企业概览基础字段（重聚合 TODO 标注）；越权企业按 7070 拒绝
 
 ## 5. team 读路径（team-read）
 
-- [ ] 5.1 `GET /console/enterprise/{enterprise_id}/teams`：企业下团队列表（tenant_info where enterprise_id）
-- [ ] 5.2 `GET /console/enterprise/{enterprise_id}/user/{user_id}/teams`：用户加入的团队（团队切换器）
-- [ ] 5.3 `GET /console/teams/{team_name}/overview`：团队概览（经 TeamContextResolver）；团队不存在返回"团队不存在"
+- [x] 5.1 `GET /console/enterprise/{enterprise_id}/teams`：企业下团队列表（tenant_info where enterprise_id）
+- [x] 5.2 `GET /console/enterprise/{enterprise_id}/user/{user_id}/teams`：用户加入的团队（团队切换器）
+- [x] 5.3 `GET /console/teams/{team_name}/overview`：团队概览（经 TeamContextResolver）；团队不存在返回"团队不存在"
 
 ## 6. 单元测试
 
-- [ ] 6.1 ContextResolver：企业解析、团队解析、团队不存在→ServiceHandleException、越权企业拒绝
+- [x] 6.1 ContextResolver：企业解析、团队解析、团队不存在→ServiceHandleException、越权企业拒绝
 - [ ] 6.2 Repository 查询（mock/切片）：按 enterprise_id/tenant_name/user_id 取数
 - [ ] 6.3 Controller 切片：各端点信封结构（data.bean/data.list）、未认证 401
 
 ## 7. 端到端对照 7070（同库同密钥逐接口 diff）
 
-- [ ] 7.1 kuship(8000) 连共享 console 库 + 同源 SECRET_KEY 启动；准备测试用户与其企业/团队数据
-- [ ] 7.2 逐接口 diff 7070 vs 8000：users/details、enterprises、enterprise/{eid}/overview、enterprise/{eid}/teams、enterprise/{eid}/user/{uid}/teams、teams/{team}/overview —— 信封/字段/错误码一致
+- [x] 7.1 kuship(8000) 连共享 console 库 + 同源 SECRET_KEY 启动；准备测试用户与其企业/团队数据
+- [x] 7.2 逐接口 diff 7070 vs 8000：users/details、enterprises、enterprise/{eid}/overview、enterprise/{eid}/teams、enterprise/{eid}/user/{uid}/teams、teams/{team}/overview —— 信封/字段/错误码一致
 - [ ] 7.3 rainbond-ui proxyTarget 指 8000，登录后控制台外壳加载、企业/团队列表、团队切换、团队概览可用
-- [ ] 7.4 记录与 7070 的字段差异并校准（沿用 P0 经验，源码推断不足处以实测为准）
+- [x] 7.4 记录与 7070 的字段差异并校准（沿用 P0 经验，源码推断不足处以实测为准）
