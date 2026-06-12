@@ -141,6 +141,51 @@ class TeamMemberRoleServiceTest {
     }
 
     @Test
+    void not_join_users_excludes_members_and_paginates() {
+        teamHas(700002); // 团队成员仅 700002
+        UserInfo m = user(700002, "interop");
+        m.setEnterpriseId("e1");
+        UserInfo v = user(700003, "viewer");
+        v.setEnterpriseId("e1");
+        when(userRepo.findByEnterpriseId("e1")).thenReturn(List.of(m, v));
+        Map<String, Object> r = service.listNotJoinUsers(team(700002), "e1", null, 1, 10);
+        assertThat(r).containsEntry("total", 1).containsEntry("page", 1).containsEntry("page_size", 10);
+        List<Map<String, Object>> list = (List<Map<String, Object>>) r.get("list");
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0)).containsEntry("user_id", 700003).containsEntry("nick_name", "viewer")
+                .containsKey("enterprise_id").containsKey("email");
+    }
+
+    @Test
+    void batch_remove_deletes_membership_and_roles() {
+        when(roleRepo.findByKindAndKindId("team", TID)).thenReturn(List.of(role(1, "管理员")));
+        service.batchRemoveMembers(team(700002), 700002, List.of(700003));
+        verify(permRel).deleteByUserIdInAndTenantId(List.of(700003), 1);
+        verify(userRoleRepo).deleteByUserIdInAndRoleIdIn(eq(List.of("700003")), anyList());
+    }
+
+    @Test
+    void batch_remove_rejects_empty() {
+        assertThatThrownBy(() -> service.batchRemoveMembers(team(700002), 700002, List.of()))
+                .isInstanceOf(ServiceHandleException.class).hasMessageContaining("failed");
+    }
+
+    @Test
+    void batch_remove_rejects_self() {
+        assertThatThrownBy(() -> service.batchRemoveMembers(team(700002), 700002, List.of(700002)))
+                .isInstanceOf(ServiceHandleException.class);
+        verify(permRel, org.mockito.Mockito.never()).deleteByUserIdInAndTenantId(anyList(), any());
+    }
+
+    @Test
+    void batch_remove_rejects_creater() {
+        // creater=700002，移除列表含创建者（非请求者 700099）
+        assertThatThrownBy(() -> service.batchRemoveMembers(team(700002), 700099, List.of(700002)))
+                .isInstanceOf(ServiceHandleException.class).hasMessageContaining("failed");
+        verify(permRel, org.mockito.Mockito.never()).deleteByUserIdInAndTenantId(anyList(), any());
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void user_perms_wraps_tree_with_user_id() {
         teamHas(700003);

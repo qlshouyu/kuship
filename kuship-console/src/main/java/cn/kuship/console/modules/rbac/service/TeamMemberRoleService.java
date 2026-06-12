@@ -218,6 +218,61 @@ public class TeamMemberRoleService {
         return bean;
     }
 
+    /**
+     * 未加入该团队的企业用户（对齐 get_not_join_users）：企业用户 − 团队成员，query 模糊 nick_name，分页。
+     * 返回 {list, page, page_size, total}。
+     */
+    public Map<String, Object> listNotJoinUsers(Tenants team, String enterpriseId, String query, int page, int pageSize) {
+        java.util.Set<Integer> memberIds = permRelTenantRepository.findByTenantId(team.getId()).stream()
+                .map(PermRelTenant::getUserId).collect(Collectors.toSet());
+        List<UserInfo> candidates = userInfoRepository.findByEnterpriseId(enterpriseId).stream()
+                .filter(u -> !memberIds.contains(u.getUserId()))
+                .filter(u -> query == null || query.isBlank()
+                        || (u.getNickName() != null && u.getNickName().contains(query)))
+                .collect(Collectors.toList());
+        int total = candidates.size();
+        int from = Math.max(0, (page - 1) * pageSize);
+        int to = Math.min(candidates.size(), from + pageSize);
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (UserInfo u : (from >= candidates.size() ? List.<UserInfo>of() : candidates.subList(from, to))) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("user_id", u.getUserId());
+            m.put("nick_name", u.getNickName());
+            m.put("enterprise_id", u.getEnterpriseId());
+            m.put("email", u.getEmail());
+            list.add(m);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("list", list);
+        out.put("page", page);
+        out.put("page_size", pageSize);
+        out.put("total", total);
+        return out;
+    }
+
+    /**
+     * 批量移除团队成员（对齐 batch_delete_users + UserDelView 校验）：
+     * 空/含自身/含创建者 → 400；否则事务删 tenant_perms（成员关系）+ 团队内 user_role。
+     */
+    @Transactional
+    public void batchRemoveMembers(Tenants team, Integer requesterUserId, List<Integer> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            throw ServiceHandleException.badRequest("failed", "删除成员不能为空");
+        }
+        if (userIds.contains(requesterUserId)) {
+            throw ServiceHandleException.badRequest("failed", "不能删除自己");
+        }
+        if (team.getCreater() != null && userIds.contains(team.getCreater())) {
+            throw ServiceHandleException.badRequest("failed", "不能删除团队创建者！");
+        }
+        permRelTenantRepository.deleteByUserIdInAndTenantId(userIds, team.getId());
+        List<String> teamRoleIds = new ArrayList<>(teamRoleIdName(team.getTenantId()).keySet());
+        if (!teamRoleIds.isEmpty()) {
+            List<String> userIdStrs = userIds.stream().map(String::valueOf).collect(Collectors.toList());
+            userRoleRepository.deleteByUserIdInAndRoleIdIn(userIdStrs, teamRoleIds);
+        }
+    }
+
     /** 目标必须是团队成员，否则"用户不存在"（对齐 get_team_users().filter(user_id=..) 取空）。 */
     private UserInfo requireMember(Tenants team, Integer userId) {
         return getTeamUsers(team, null).stream()

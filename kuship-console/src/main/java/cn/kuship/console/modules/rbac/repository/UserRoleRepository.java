@@ -18,4 +18,7 @@ public interface UserRoleRepository extends JpaRepository<UserRole, Integer> {
 
     /** 删除某用户在一批角色内的关联（成员角色重建/清空用）。 */
     void deleteByUserIdAndRoleIdIn(String userId, List<String> roleIds);
+
+    /** 批量删除一批用户在一批角色内的关联（移除成员时清团队角色关联）。 */
+    void deleteByUserIdInAndRoleIdIn(List<String> userIds, List<String> roleIds);
 }

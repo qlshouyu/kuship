@@ -87,6 +87,48 @@ public class TeamMemberController {
         return GeneralMessage.bean(200, "success", null, bean);
     }
 
+    @GetMapping("/console/teams/{team_name}/notjoinusers")
+    @RequiresPerms(kind = PermScope.TEAM, codes = {610001})
+    public ApiResult notJoinUsers(@PathVariable("team_name") String teamName,
+                                  @RequestParam(value = "page", defaultValue = "1") int page,
+                                  @RequestParam(value = "page_size", defaultValue = "10") int pageSize,
+                                  @RequestParam(value = "query", required = false) String query) {
+        String eid = requestContext.getCurrentUser().getEnterpriseId();
+        Map<String, Object> r = memberService.listNotJoinUsers(team(teamName), eid, query, page, pageSize);
+        ApiResult res = GeneralMessage.list(200, null, null, (List<?>) r.get("list"));
+        res.putExtra("page", r.get("page"));
+        res.putExtra("page_size", r.get("page_size"));
+        res.putExtra("total", r.get("total"));
+        return res;
+    }
+
+    @DeleteMapping("/console/teams/{team_name}/users/batch/delete")
+    @RequiresPerms(kind = PermScope.TEAM, codes = {610004})
+    public ApiResult batchDelete(@PathVariable("team_name") String teamName, @RequestBody Map<String, Object> body) {
+        List<Integer> userIds = parseUserIds(body);
+        memberService.batchRemoveMembers(team(teamName), requestContext.getCurrentUser().getUserId(), userIds);
+        return GeneralMessage.message(200, "delete the success", "删除成功");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Integer> parseUserIds(Map<String, Object> body) {
+        List<Integer> out = new ArrayList<>();
+        if (body == null) {
+            return out;
+        }
+        Object ids = body.get("user_ids");
+        if (ids instanceof List<?> l) {
+            for (Object o : l) {
+                if (o instanceof Number n) {
+                    out.add(n.intValue());
+                } else if (o != null) {
+                    out.add(Integer.valueOf(o.toString()));
+                }
+            }
+        }
+        return out;
+    }
+
     @SuppressWarnings("unchecked")
     private static List<Integer> parseRoleIds(Map<String, Object> body) {
         List<Integer> out = new ArrayList<>();
