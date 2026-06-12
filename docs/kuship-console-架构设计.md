@@ -16,7 +16,7 @@
 
 Rainbond 本身就是 **控制台(console) ↔ region-api ↔ Kubernetes** 的三层架构。我们替换的只是最上层 console 的**实现语言**（Python/Django → Java/Spring Boot），对上游前端、对下游 region-api 的**协议契约保持完全不变**。换的是引擎，不是接口——这正是这套迁移在工程上成立的根本原因。
 
-> 注：git 历史中已存在一版 648 个 Java 文件的 kuship-console 实现（已验证可行），本轮按"全新设计"重做，但其沉淀的契约约束与经验教训在第 6、7 章保留。
+> 注：git 历史 **提交 `261d345`** 中曾有一版 648 个 Java 文件的 kuship-console 实现（已验证可行），随后被提交 `c26936b`（"docker"）整体删除——**当前 HEAD 不含任何 kuship-console 源码**。本轮按"全新设计"**全部重做，不参照旧实现作基线**；仅保留其沉淀的契约约束与经验教训于第 6、7 章。
 
 ---
 
@@ -171,7 +171,8 @@ View(console/views/*.py)  →  Service(console/services/*.py, 单例)
 | 鉴权 | Spring Security + jjwt（HS256，兼容 drf-jwt） |
 | 下游客户端 | Apache HttpClient 5（region-api）；io.kubernetes client-java（rke2 阶段） |
 | API 文档 | springdoc-openapi |
-| 缓存 | Caffeine（本地）；可选 Redis（JWT 会话） |
+| 缓存 | Caffeine（本地） |
+| 会话 | **Redis（首版必需）**：JWT 会话黑名单 / 强制下线（决策已定，见 §8） |
 | 其它 | Lombok、BouncyCastle（证书）、aliyun-sms |
 
 ### 4.2 分层架构（DDD 风格）
@@ -239,6 +240,7 @@ cn.kuship.console
 - payload 直用 Django 风格 claims：`user_id`/`username`/`nick_name`/`email`/`exp`/`orig_iat`；
 - token 中 `user_id` 必须真实存在于 `user_info` 表，否则 401 `user not found`；
 - 401 `msg` 暴露具体原因，`msg_show` 统一中文文案。
+- **Redis 会话黑名单（首版必需，决策已定）**：每请求在验签通过后查 Redis 黑名单（命中即 401）；登出/强制下线把 token（或 `user_id`+`orig_iat`）写入黑名单，TTL 对齐 token 剩余 `exp`。对应旧版可选的 `JwtManager`。
 
 **请求上下文** `RequestContext`(@RequestScope)：`JwtAuthenticationFilter` 真实加载 user；`TenantContextInterceptor` 从路径变量 `{team_name}`/`{region_name}` 写入 `teamName`/`regionName`。
 
@@ -296,8 +298,8 @@ P6 openapi/v1 + monitor + 杂项(errlog/announcement/...)
 ```
 
 ### 7.3 当前状态
-- 工作区 `kuship-console/` 已清空（用户主动删除，准备重做）；
-- git `HEAD` 保留前一版完整实现，可作参考但不作为本轮基线；
+- 工作区 `kuship-console/` 已清空；**本轮全部重做，不参照任何旧实现作基线**（用户已明确）；
+- 旧版 648 文件实现在提交 `261d345`，已被 `c26936b` 删除；**HEAD 不含 kuship-console 源码**，不作参考基线；
 - `docs/` 已有 `接口实测发现.md`（实测校准）与本架构文档。
 
 ---
@@ -312,11 +314,13 @@ P6 openapi/v1 + monitor + 杂项(errlog/announcement/...)
 | 共享库并发写 | rainbond-console 与 kuship-console 可能同时写同库 | 明确切流策略：一个团队/域只由一端负责写 |
 | Redis JwtManager | 是否需要会话黑名单 | 评估；可先无状态 JWT，后续按需加 |
 
-### 待用户决策
-- **是否保留 `/openapi/v1`**：第三方开放 API 是否在本轮范围内？
-- **是否需要 Redis 会话追踪**：还是纯无状态 JWT 即可？
-- **多 region 与 rke2 集群管理**：是否纳入首版，还是 region-api 对接优先？
-- **参照的 Rainbond 版本钉死**：以哪个 region-api 版本为兼容基线？
+### 决策记录（2026-06-11 已定）
+- ✅ **`/openapi/v1` 推迟到后期**：首版只做 `/console/*` 内部控制台接口，先让 rainbond-ui 完整跑通；openapi 独立 token 体系单独一轮。
+- ✅ **完全替换，旧 rainbond-console 停掉**：kuship-console 单独负责写 `console` 库，无并发双写问题（消除原"共享库并发写"风险项）。
+- ✅ **Redis 会话黑名单（首版必需）**：非纯无状态；引入 Spring Data Redis，JWT 过滤器每请求查黑名单、登出写黑名单（见 §4.1 / §4.4）。
+
+- ✅ **单 region-api 对接优先**：首版只打通**单 region-api**，多 region / rke2 多集群管理推迟到后期；RegionClient 骨架按单 region 设计，预留多 region 扩展点。
+- ✅ **兼容基线钉死 Rainbond v6.9.0-release**：以 `reference/rainbond` 子模块当前 commit **`44c5c34d`**（`v6.9.0-release-1-g44c5c34da`，2026-06-08）为 region-api 契约的唯一兼容基线；RegionClient 各域方法按此版本复刻。
 
 ---
 
