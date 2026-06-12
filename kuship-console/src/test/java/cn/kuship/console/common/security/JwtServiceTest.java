@@ -34,7 +34,8 @@ class JwtServiceTest {
         JwtClaims claims = svc.parse(token);
         assertThat(claims.userId()).isEqualTo(42);
         assertThat(claims.username()).isEqualTo("admin");
-        assertThat(claims.nickName()).isEqualTo("admin");
+        // 实测对齐 7070：token 载荷为 {user_id, username, exp, email}，不含 nick_name → 解析为 null
+        assertThat(claims.nickName()).isNull();
         assertThat(claims.email()).isEqualTo("admin@goodrain.com");
         assertThat(claims.expiration()).isNotNull();
         assertThat(claims.rawToken()).isEqualTo(token);

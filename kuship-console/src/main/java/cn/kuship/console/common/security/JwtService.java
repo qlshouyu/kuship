@@ -22,8 +22,8 @@ import java.util.Map;
  * <p>不使用 jjwt：jjwt 强制 HS256 密钥 ≥256 位，而 Django {@code SECRET_KEY} 长度任意（PyJWT 不限制）。
  * 这里直接用 {@code HmacSHA256} 实现，等价于 PyJWT 的签名方式，因此两端互验通过。
  *
- * <p>载荷对齐默认 {@code jwt_payload_handler}：{@code user_id, username, email, nick_name, exp(秒)}，
- * 无 {@code orig_iat}（JWT_ALLOW_REFRESH=False）。
+ * <p>载荷实测对齐 7070 真实 token：{@code {user_id, username, exp, email}}（顺序如此，不含 nick_name），
+ * 无 {@code orig_iat}（JWT_ALLOW_REFRESH=False）。header 亦与 7070 一致：{@code {"typ":"JWT","alg":"HS256"}}。
  */
 @Service
 public class JwtService {
@@ -45,12 +45,12 @@ public class JwtService {
     /** 为用户签发 token（与 rainbond-console 登录签发等价）。 */
     public String generate(UserInfo user) {
         long exp = Instant.now().plus(expirationDays, ChronoUnit.DAYS).getEpochSecond();
+        // 实测 7070 真实载荷为 {user_id, username, exp, email}（顺序如此，且不含 nick_name），逐字段对齐
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("user_id", user.getUserId());
         payload.put("username", user.getNickName());
-        payload.put("email", user.getEmail());
-        payload.put("nick_name", user.getNickName());
         payload.put("exp", exp);
+        payload.put("email", user.getEmail());
 
         String header = B64.encodeToString(HEADER_JSON.getBytes(StandardCharsets.UTF_8));
         String body = B64.encodeToString(objectMapper.writeValueAsBytes(payload));
