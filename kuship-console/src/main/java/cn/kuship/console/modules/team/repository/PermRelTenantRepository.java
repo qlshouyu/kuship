@@ -9,5 +9,8 @@ public interface PermRelTenantRepository extends JpaRepository<PermRelTenant, In
 
     List<PermRelTenant> findByUserId(Integer userId);
 
+    /** 团队成员关系（tenant_id = 团队 PK）。 */
+    List<PermRelTenant> findByTenantId(Integer tenantId);
+
     long countByTenantId(Integer tenantId);
 }
