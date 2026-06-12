@@ -22,6 +22,14 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void no_permissions_maps_to_403_with_error_code_10402() {
+        ResponseEntity<ApiResult> resp = handler.handleService(new NoPermissionsException());
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN); // HTTP 403
+        assertThat(resp.getBody().getCode()).isEqualTo(10402);            // 信封 code = errorCode
+        assertThat(resp.getBody().getMsgShow()).isEqualTo("没有操作权限");
+    }
+
+    @Test
     void validation_maps_to_400() {
         ResponseEntity<ApiResult> resp = handler.handleValidation(new IllegalArgumentException("bad arg"));
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);

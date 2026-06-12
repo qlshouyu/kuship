@@ -46,6 +46,34 @@ class PermsCatalogTest {
     }
 
     @Test
+    void admin_perm_codes_superset_of_enterprise_adminer_codes() {
+        // admin 整型码 = get_enterprise_adminer_codes(团队全码+企业全码) ∪ common_perms 码
+        // （rainbond list_enterprise_perm_codes_by_roles 尾部恒叠加 common，故含 120000 get_ent_teams）
+        Set<Integer> codes = PermsCatalog.listEnterprisePermCodesByRoles(List.of("admin"));
+        Set<Integer> adminer = PermsCatalog.getEnterpriseAdminerCodes();
+        assertThat(codes).containsAll(adminer);
+        assertThat(codes).containsAll(PermsCatalog.allTeamPermCodes());
+        assertThat(codes).contains(200001, 100000, 120000); // 团队码、企业码、common 的 get_ent_teams
+    }
+
+    @Test
+    void non_admin_role_codes_include_common() {
+        // app_store 角色：自身码（110000..110010）+ common 码（含 120000 get_ent_teams）
+        Set<Integer> codes = PermsCatalog.listEnterprisePermCodesByRoles(List.of("app_store"));
+        assertThat(codes).contains(110000, 110010, 120000);
+        // 不含团队码 200001（非 admin、非全码）
+        assertThat(codes).doesNotContain(200001);
+    }
+
+    @Test
+    void empty_roles_keep_common_codes_only() {
+        Set<Integer> codes = PermsCatalog.listEnterprisePermCodesByRoles(List.of());
+        // 仅 common_perms 的 6 个码
+        assertThat(codes).containsExactlyInAnyOrder(110000, 110001, 110002, 110003, 110006, 120000);
+        assertThat(codes).doesNotContain(200001);
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void team_tree_structure_matches_7070() {
         Map<String, Object> tree = PermsCatalog.packRolePermsTree("team", PermsCatalog.team(), Set.of(), true);

@@ -100,6 +100,14 @@ public class RbacReadService {
         return tree;
     }
 
+    /**
+     * 普通成员在某团队的全局（app_id=-1）权限码并集（供 check_perms 团队码计算复用）。
+     * 非成员/无角色返回空集。
+     */
+    public Set<Integer> teamMemberGlobalPermCodes(String tenantId, Integer userId) {
+        return globalPermCodes(tenantId, userId);
+    }
+
     /** 普通成员：其团队角色的全局（app_id=-1）权限码并集。 */
     private Set<Integer> globalPermCodes(String tenantId, Integer userId) {
         List<RoleInfo> teamRoles = roleInfoRepository.findByKindAndKindId(KIND_TEAM, tenantId);

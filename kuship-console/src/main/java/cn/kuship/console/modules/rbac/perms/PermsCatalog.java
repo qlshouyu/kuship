@@ -314,4 +314,63 @@ public final class PermsCatalog {
         }
         return out;
     }
+
+    // ---- 整型权限码展开（perms.py list_enterprise_perm_codes_by_role(s) / get_enterprise_adminer_codes）----
+    //      鉴权用，区别于上面的字符串 group.name 展开（users/details 展示用），两套不可混用。
+
+    private static Set<Integer> commonPermCodes() {
+        Set<Integer> out = new LinkedHashSet<>();
+        for (Perm perm : COMMON_PERMS) {
+            out.add(perm.code());
+        }
+        return out;
+    }
+
+    /** 团队 kind 全部权限码（owner 短路用，对齐 {@code get_perm_code(TEAM)}）。 */
+    public static Set<Integer> allTeamPermCodes() {
+        Set<Integer> out = new LinkedHashSet<>();
+        for (AssembledPerm p : getPerms(team(), "team")) {
+            out.add(p.code());
+        }
+        return out;
+    }
+
+    /** 团队 + 企业全部权限码（admin 全码，对齐 {@code get_enterprise_adminer_codes}）。 */
+    public static Set<Integer> getEnterpriseAdminerCodes() {
+        Set<Integer> out = new LinkedHashSet<>();
+        for (AssembledPerm p : allTeamAndEnterprisePerms()) {
+            out.add(p.code());
+        }
+        return out;
+    }
+
+    private static Set<Integer> listEnterprisePermCodesByRole(String role) {
+        if ("admin".equals(role)) {
+            return getEnterpriseAdminerCodes();
+        }
+        Set<Integer> out = new LinkedHashSet<>();
+        List<Perm> ps = ENTERPRISE.get(role); // 未知角色按空处理（避开 rainbond 原实现的取值异常）
+        if (ps != null) {
+            for (Perm perm : ps) {
+                out.add(perm.code());
+            }
+        }
+        out.addAll(commonPermCodes());
+        return out;
+    }
+
+    /**
+     * 角色名列表 → 整型权限码集合（鉴权用）。对齐 {@code list_enterprise_perm_codes_by_roles}：
+     * admin→全码；其它→角色码 + common 码；并恒定叠加 common 码。
+     */
+    public static Set<Integer> listEnterprisePermCodesByRoles(List<String> roles) {
+        Set<Integer> out = new LinkedHashSet<>();
+        if (roles != null) {
+            for (String role : roles) {
+                out.addAll(listEnterprisePermCodesByRole(role));
+            }
+        }
+        out.addAll(commonPermCodes());
+        return out;
+    }
 }

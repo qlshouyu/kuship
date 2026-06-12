@@ -3,6 +3,8 @@ package cn.kuship.console.modules.team.controller;
 import cn.kuship.console.common.exception.ServiceHandleException;
 import cn.kuship.console.common.response.ApiResult;
 import cn.kuship.console.common.response.GeneralMessage;
+import cn.kuship.console.modules.authorization.annotation.PermScope;
+import cn.kuship.console.modules.authorization.annotation.RequiresPerms;
 import cn.kuship.console.modules.enterprise.service.EnterpriseContextResolver;
 import cn.kuship.console.modules.team.entity.Tenants;
 import cn.kuship.console.modules.team.service.TeamContextResolver;
@@ -50,8 +52,9 @@ public class TeamController {
         return GeneralMessage.list(200, "team query success", "查询成功", list);
     }
 
-    /** GET /console/teams/{team_name}/overview?region_name=... （region 作用域，缺 region_name → 400） */
+    /** GET /console/teams/{team_name}/overview?region_name=... （region 作用域，缺 region_name → 400；需团队 describe 200001） */
     @GetMapping("/console/teams/{team_name}/overview")
+    @RequiresPerms(kind = PermScope.TEAM, codes = {200001})
     public ApiResult teamOverview(@PathVariable("team_name") String teamName,
                                   @RequestParam(value = "region_name", required = false) String regionName) {
         if (regionName == null || regionName.isBlank()) {

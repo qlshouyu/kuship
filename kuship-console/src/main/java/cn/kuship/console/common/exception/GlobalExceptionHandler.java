@@ -29,7 +29,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ServiceHandleException.class)
     public ResponseEntity<ApiResult> handleService(ServiceHandleException ex) {
-        ApiResult body = GeneralMessage.message(ex.getStatus(), ex.getMsg(), ex.getMsgShow());
+        // 信封 code 取业务 errorCode（默认回落 status），HTTP 取 status
+        ApiResult body = GeneralMessage.message(ex.getErrorCode(), ex.getMsg(), ex.getMsgShow());
         return ResponseEntity.status(ex.getStatus()).body(body);
     }
 

@@ -6,16 +6,24 @@ package cn.kuship.console.common.exception;
  */
 public class ServiceHandleException extends RuntimeException {
 
-    /** HTTP 状态码（同时作为信封 code） */
+    /** HTTP 状态码 */
     private final int status;
+    /** 业务信封 code（drf error_code）；默认回落为 {@link #status}，与既有行为一致 */
+    private final int errorCode;
     /** 英文 msg */
     private final String msg;
     /** 中文展示文案 msg_show */
     private final String msgShow;
 
     public ServiceHandleException(int status, String msg, String msgShow) {
+        this(status, status, msg, msgShow);
+    }
+
+    /** 显式区分 HTTP status 与业务 errorCode（如无权：status=403、errorCode=10402）。 */
+    public ServiceHandleException(int status, int errorCode, String msg, String msgShow) {
         super(msg);
         this.status = status;
+        this.errorCode = errorCode;
         this.msg = msg;
         this.msgShow = msgShow;
     }
@@ -30,6 +38,10 @@ public class ServiceHandleException extends RuntimeException {
 
     public int getStatus() {
         return status;
+    }
+
+    public int getErrorCode() {
+        return errorCode;
     }
 
     public String getMsg() {
