@@ -1,9 +1,5 @@
-# account-profile Specification
+## MODIFIED Requirements
 
-## Purpose
-
-TBD - created by archiving change kuship-console-p1a-console-entry. Update Purpose after archive.
-## Requirements
 ### Requirement: 当前登录用户详情
 
 系统 SHALL 提供 `GET /console/users/details`，对已认证请求返回当前登录用户（取自 P0 认证后注入的 RequestContext.currentUser）的详情信封。bean 字段集以 rainbond-console(7070) 实测为准。其中 RBAC 派生字段 SHALL 返回真实值（不再为 P1-a 的空占位）：企业 `permissions` 取自 `list_enterprise_perms_by_roles(roles)`；每个团队的 `role_name_list` 取自该用户在该团队的角色解析；每个团队的 `tenant_actions` 取自该用户在该团队的权限树解析（团队创建者或企业管理员短路为全权限）。这些字段 SHALL 与 7070 同接口逐叶子一致。
@@ -27,4 +23,3 @@ TBD - created by archiving change kuship-console-p1a-console-entry. Update Purpo
 
 - **WHEN** 不带 token 请求 `GET /console/users/details`
 - **THEN** 返回 401（沿用 P0 鉴权），不泄漏用户信息
-

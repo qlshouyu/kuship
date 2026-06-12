@@ -6,6 +6,7 @@ import cn.kuship.console.modules.enterprise.entity.EnterpriseUserPerm;
 import cn.kuship.console.modules.enterprise.entity.TenantEnterprise;
 import cn.kuship.console.modules.enterprise.repository.EnterpriseUserPermRepository;
 import cn.kuship.console.modules.enterprise.repository.TenantEnterpriseRepository;
+import cn.kuship.console.modules.rbac.service.RbacReadService;
 import cn.kuship.console.modules.region.entity.RegionConfig;
 import cn.kuship.console.modules.region.repository.RegionConfigRepository;
 import cn.kuship.console.modules.team.entity.PermRelTenant;
@@ -23,9 +24,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 当前用户详情（GET /console/users/details）。字段对照 docs/p1a-7070-reference.md。
- * <p>RBAC 派生字段（permissions、每团队 tenant_actions/role_name_list）本轮返回空/默认，
- * owner 短路给 is_team_owner / enterprise admin 的 roles，完整 RBAC 留 P1-b。
+ * 当前用户详情（GET /console/users/details）。字段对照 docs/p1a-7070-reference.md、docs/p1b-7070-reference.md。
+ * <p>RBAC 派生字段（企业 permissions、每团队 role_name_list/tenant_actions）由 {@link RbacReadService} 解析（P1-b）：
+ * 企业权限按角色展开，团队权限树对 owner / 企业管理员短路为全 true。
  */
 @Service
 public class AccountProfileService {
@@ -37,6 +38,7 @@ public class AccountProfileService {
     private final TenantRegionInfoRepository tenantRegionRepository;
     private final PermRelTenantRepository permRelTenantRepository;
     private final RegionConfigRepository regionConfigRepository;
+    private final RbacReadService rbacReadService;
 
     public AccountProfileService(RequestContext requestContext,
                                  TenantEnterpriseRepository enterpriseRepository,
@@ -44,7 +46,8 @@ public class AccountProfileService {
                                  TenantsRepository tenantsRepository,
                                  TenantRegionInfoRepository tenantRegionRepository,
                                  PermRelTenantRepository permRelTenantRepository,
-                                 RegionConfigRepository regionConfigRepository) {
+                                 RegionConfigRepository regionConfigRepository,
+                                 RbacReadService rbacReadService) {
         this.requestContext = requestContext;
         this.enterpriseRepository = enterpriseRepository;
         this.enterpriseUserPermRepository = enterpriseUserPermRepository;
@@ -52,6 +55,7 @@ public class AccountProfileService {
         this.tenantRegionRepository = tenantRegionRepository;
         this.permRelTenantRepository = permRelTenantRepository;
         this.regionConfigRepository = regionConfigRepository;
+        this.rbacReadService = rbacReadService;
     }
 
     public Map<String, Object> currentUserDetails() {
@@ -77,15 +81,16 @@ public class AccountProfileService {
         bean.put("is_enterprise_active", enterprise == null ? 0 : enterprise.getIsActive());
         bean.put("is_enterprise_admin", isEntAdmin);
         bean.put("is_initial_enterprise_admin", isInitialAdmin);
-        bean.put("roles", isEntAdmin ? List.of("admin") : new ArrayList<>());
-        bean.put("permissions", new ArrayList<>()); // 企业权限码 → P1-b
-        bean.put("teams", currentUserTeams(eid, user.getUserId()));
+        List<String> roles = rbacReadService.listRoles(eid, user.getUserId());
+        bean.put("roles", roles);
+        bean.put("permissions", rbacReadService.listEnterprisePermissions(roles));
+        bean.put("teams", currentUserTeams(eid, user.getUserId(), isEntAdmin));
         bean.put("oauth_services", new ArrayList<>());
         return bean;
     }
 
     /** 当前用户的团队（成员 ∪ 自建），仅保留有 region 的团队（对齐 rainbond 过滤）。 */
-    private List<Map<String, Object>> currentUserTeams(String enterpriseId, Integer userId) {
+    private List<Map<String, Object>> currentUserTeams(String enterpriseId, Integer userId, boolean isEntAdmin) {
         List<Integer> pks = permRelTenantRepository.findByUserId(userId).stream()
                 .map(PermRelTenant::getTenantId).collect(Collectors.toList());
         List<Tenants> teams = pks.isEmpty() ? new ArrayList<>() : tenantsRepository.findByIdIn(pks);
@@ -109,9 +114,10 @@ public class AccountProfileService {
             m.put("creater", t.getCreater());
             m.put("create_time", t.getCreateTime());
             m.put("namespace", t.getNamespace());
-            m.put("role_name_list", new ArrayList<>()); // RBAC 角色名 → P1-b
-            m.put("tenant_actions", new LinkedHashMap<>()); // RBAC 权限树 → P1-b
-            m.put("is_team_owner", userId.equals(t.getCreater()));
+            boolean isOwner = userId.equals(t.getCreater());
+            m.put("role_name_list", rbacReadService.getUserTeamRoles(t.getTenantId(), userId));
+            m.put("tenant_actions", rbacReadService.getUserTeamActions(t.getTenantId(), userId, isOwner, isEntAdmin));
+            m.put("is_team_owner", isOwner);
             out.add(m);
         }
         return out;
