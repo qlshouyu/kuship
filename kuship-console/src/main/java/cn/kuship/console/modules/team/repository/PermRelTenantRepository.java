@@ -15,5 +15,8 @@ public interface PermRelTenantRepository extends JpaRepository<PermRelTenant, In
     /** 批量移除团队成员关系（user_id∈ids 且 tenant_id=团队PK）。 */
     void deleteByUserIdInAndTenantId(List<Integer> userIds, Integer tenantId);
 
+    /** 删除团队全部成员关系（删团队用）。 */
+    void deleteByTenantId(Integer tenantId);
+
     long countByTenantId(Integer tenantId);
 }

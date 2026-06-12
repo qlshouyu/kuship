@@ -159,6 +159,14 @@ class PermsCatalogTest {
     }
 
     @Test
+    void default_team_role_perms_counts() {
+        // 与 perms.py DEFAULT_TEAM_ROLE_PERMS 一致：管理员 103 / 开发者 78 / 观察者 24
+        assertThat(PermsCatalog.DEFAULT_TEAM_ROLE_PERMS.get("管理员")).hasSize(103).contains(200001, 630002, 800001);
+        assertThat(PermsCatalog.DEFAULT_TEAM_ROLE_PERMS.get("开发者")).hasSize(78).contains(200001).doesNotContain(630004);
+        assertThat(PermsCatalog.DEFAULT_TEAM_ROLE_PERMS.get("观察者")).hasSize(24).contains(200001, 630001);
+    }
+
+    @Test
     void unpack_single_true_leaf() {
         Map<String, Object> tree = PermsCatalog.packRolePermsTree("team", PermsCatalog.team(), Set.of(200001), false);
         List<PermsCatalog.RolePermCode> codes = PermsCatalog.unpackRolePermsTree(tree);
