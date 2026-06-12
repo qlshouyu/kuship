@@ -2,7 +2,7 @@
 
 ### Requirement: JWT 验签兼容 djangorestframework-jwt
 
-系统 SHALL 以 HS256 验签请求头 `Authorization` 中的 JWT，密钥 `JWT_SECRET_KEY` MUST 与 rainbond-console 同源。接受 `GRJWT`（主）与 `jwt`（兼容）前缀，前缀大小写不敏感。claims MUST 直接采用 Django 风格 `user_id/username/nick_name/email/exp/orig_iat`，不做名字转换。
+系统 SHALL 以 HS256 验签请求头 `Authorization` 中的 JWT，密钥 MUST 与 rainbond-console 同源（来自环境变量 `SECRET_KEY`，即 drf-jwt 的 `JWT_SECRET_KEY=SECRET_KEY`）。接受 `GRJWT`（主）与 `jwt`（兼容）前缀，前缀大小写不敏感。claims MUST 直接采用 Django 风格 `user_id/username/nick_name/email/exp`，不做名字转换（实测 `JWT_ALLOW_REFRESH=False`，token 不含 `orig_iat`）。
 
 #### Scenario: GRJWT 前缀验签通过
 

@@ -1,0 +1,48 @@
+server:
+  port: 8000
+  # 不设置 servlet.context-path：根域下还有 /openapi、/app-server 等，前缀由各 controller 显式声明
+
+spring:
+  application:
+    name: kuship-console
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DB:console}?characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      # 共享 Django 的 console 库：只校验、绝不输出 DDL
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+kuship:
+  jwt:
+    # 必须与 rainbond-console 同源（drf-jwt 的 JWT_SECRET_KEY = 环境变量 SECRET_KEY）
+    secret: ${SECRET_KEY:}
+    # 主前缀 GRJWT，兼容 jwt / Bearer（大小写不敏感）
+    header-prefixes: GRJWT,jwt,Bearer
+    cookie-name: token
+    expiration-days: 3650
+  region:
+    ssl-verify: ${REGION_SSL_VERIFY:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    cn.kuship.console: INFO

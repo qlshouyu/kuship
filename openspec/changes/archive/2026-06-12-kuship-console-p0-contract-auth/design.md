@@ -25,7 +25,7 @@
 ## Decisions
 
 **D1 响应信封用 `ResponseBodyAdvice` 自动包装，而非每个 controller 手动包。**
-- 映射：POJO/Map→`data.bean`；`List`→`data.list`；`Page`→`data.list=content`+`data.bean.total`；`ApiResult` 幂等不重包；`String` 不自动包（Spring 特殊处理）；`@SkipResponseWrapper` 用于 SSE/文件下载。
+- 映射：POJO/Map→`data.bean`；`List`→`data.list`；`Page`→`data.list=content`+`data.total`（**实测 `general_message(..., total=total)` 把 total 放在 `data` 顶层，不是 `data.bean`**）；`ApiResult` 幂等不重包；`String` 不自动包（Spring 特殊处理）；`@SkipResponseWrapper` 用于 SSE/文件下载。
 - 顶层字段顺序 `code→msg→msg_show→data`；`msg_show` 用 `@JsonProperty("msg_show")` 强制 snake_case；`data` 必含 `bean`(默认 `{}`) 与 `list`(默认 `[]`)。
 - 备选：手动包/AOP——侵入性强、易漏，弃。
 
@@ -34,7 +34,7 @@
 - 理由：rainbond-ui 的 `request.js` 按 HTTP 状态进 axios catch + 全局 toast，状态码必须与业务语义对齐。
 
 **D3 JWT 用 jjwt 复刻 djangorestframework-jwt 1.11.0，HS256，密钥同源。**
-- 接受 `GRJWT`(主)/`jwt`(兼容) 前缀，大小写不敏感；claims 直用 Django 风格 `user_id/username/nick_name/email/exp/orig_iat`，**不做名字转换**。
+- 接受 `GRJWT`(主)/`jwt`(兼容) 前缀，大小写不敏感；claims 直用 Django 风格 `user_id/username/nick_name/email/exp`，**不做名字转换**。**实测 `JWT_ALLOW_REFRESH=False`，token 不含 `orig_iat`**；密钥来自环境变量 `SECRET_KEY`（drf-jwt 的 `JWT_SECRET_KEY=SECRET_KEY`）。
 - `JWT_SECRET_KEY` 非 local profile 启动时为空则**拒绝启动**（防止与旧端不互认）。
 - token 中 `user_id` 必须真实存在于 `user_info` 表，否则 401 `user not found`。
 - 备选：OAuth2 Resource Server——claims 形态与 drf-jwt 不一致，弃。

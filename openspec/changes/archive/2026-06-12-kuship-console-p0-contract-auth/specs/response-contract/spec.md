@@ -17,7 +17,7 @@
 #### Scenario: 返回 Page 拆分 list 与 total
 
 - **WHEN** controller 返回一个分页 `Page`
-- **THEN** `data.list` 为 `content`，`data.bean.total` 为总数
+- **THEN** `data.list` 为 `content`，`data.total` 为总数（与 rainbond-console `general_message(..., total=total)` 一致，total 在 `data` 顶层）
 
 #### Scenario: ApiResult 幂等不重复包装
 
