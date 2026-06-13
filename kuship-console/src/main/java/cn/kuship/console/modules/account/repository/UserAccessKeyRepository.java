@@ -9,4 +9,7 @@ public interface UserAccessKeyRepository extends JpaRepository<UserAccessKey, In
 
     /** 某用户的访问令牌。 */
     List<UserAccessKey> findByUserId(Integer userId);
+
+    /** 某用户的指定令牌（按 user_id + ID 作用域）。 */
+    java.util.Optional<UserAccessKey> findByUserIdAndId(Integer userId, Integer id);
 }
