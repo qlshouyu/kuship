@@ -18,11 +18,14 @@ public class EnterpriseController {
 
     private final EnterpriseReadService enterpriseReadService;
     private final EnterpriseContextResolver enterpriseContextResolver;
+    private final cn.kuship.console.modules.enterprise.service.EnterpriseInfoService enterpriseInfoService;
 
     public EnterpriseController(EnterpriseReadService enterpriseReadService,
-                               EnterpriseContextResolver enterpriseContextResolver) {
+                               EnterpriseContextResolver enterpriseContextResolver,
+                               cn.kuship.console.modules.enterprise.service.EnterpriseInfoService enterpriseInfoService) {
         this.enterpriseReadService = enterpriseReadService;
         this.enterpriseContextResolver = enterpriseContextResolver;
+        this.enterpriseInfoService = enterpriseInfoService;
     }
 
     /** GET /console/enterprises */
@@ -44,5 +47,11 @@ public class EnterpriseController {
     @GetMapping("/console/enterprise/{enterprise_id}/admin/roles")
     public ApiResult adminRoles(@PathVariable("enterprise_id") String enterpriseId) {
         return GeneralMessage.list(200, "success", null, List.copyOf(PermsCatalog.ENTERPRISE.keySet()));
+    }
+
+    /** GET /console/enterprise/{enterprise_id}/info —— 企业信息（对齐 EnterpriseRUDView.get）。 */
+    @GetMapping("/console/enterprise/{enterprise_id}/info")
+    public ApiResult info(@PathVariable("enterprise_id") String enterpriseId) {
+        return GeneralMessage.bean(200, "success", "查询成功", enterpriseInfoService.info(enterpriseId));
     }
 }
