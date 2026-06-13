@@ -117,6 +117,12 @@ class PermsCatalogTest {
     }
 
     @Test
+    void enterprise_role_keys_order() {
+        // 企业 admin 角色列表（AdminRolesView）= ENTERPRISE 键，保序
+        assertThat(List.copyOf(PermsCatalog.ENTERPRISE.keySet())).containsExactly("admin", "app_store");
+    }
+
+    @Test
     void perms_name_code_kv_maps_team_and_enterprise() {
         Map<String, Integer> kv = PermsCatalog.getPermsNameCodeKv();
         assertThat(kv).containsEntry("team_overview_describe", 200001);

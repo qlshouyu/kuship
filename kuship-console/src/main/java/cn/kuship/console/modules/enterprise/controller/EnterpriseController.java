@@ -4,6 +4,7 @@ import cn.kuship.console.common.response.ApiResult;
 import cn.kuship.console.common.response.GeneralMessage;
 import cn.kuship.console.modules.enterprise.service.EnterpriseContextResolver;
 import cn.kuship.console.modules.enterprise.service.EnterpriseReadService;
+import cn.kuship.console.modules.rbac.perms.PermsCatalog;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,5 +38,11 @@ public class EnterpriseController {
         enterpriseContextResolver.requireEnterprise(enterpriseId);
         Map<String, Object> bean = enterpriseReadService.overview(enterpriseId);
         return GeneralMessage.bean(200, "success", null, bean);
+    }
+
+    /** GET /console/enterprise/{enterprise_id}/admin/roles —— 企业角色名列表（对齐 AdminRolesView，纯计算）。 */
+    @GetMapping("/console/enterprise/{enterprise_id}/admin/roles")
+    public ApiResult adminRoles(@PathVariable("enterprise_id") String enterpriseId) {
+        return GeneralMessage.list(200, "success", null, List.copyOf(PermsCatalog.ENTERPRISE.keySet()));
     }
 }
