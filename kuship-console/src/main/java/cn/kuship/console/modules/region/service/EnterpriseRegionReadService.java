@@ -52,6 +52,62 @@ public class EnterpriseRegionReadService {
         return out;
     }
 
+    /**
+     * 单集群详情（open 级，对齐 EnterpriseRegionsRUDView.get → get_enterprise_region(check_status=False)
+     * → conver_region_info(check_status=False) → __init_region_resource_data(level="open")）。
+     * check_status=False → 不调 region 后端，资源/健康用固定默认。region_id 不存在 → null。
+     */
+    public Map<String, Object> getRegion(String enterpriseId, String regionId) {
+        RegionConfig r = regionConfigRepository.findByRegionId(regionId).orElse(null);
+        if (r == null) {
+            return null;
+        }
+        String enterpriseAlias = enterpriseRepository.findByEnterpriseId(r.getEnterpriseId())
+                .map(TenantEnterprise::getEnterpriseAlias).orElse(null);
+        return toOpenDict(r, enterpriseAlias);
+    }
+
+    /** open 级集群字典（在 safe 22 字段基础上，于 provider_cluster_id 与 desc 之间插入 6 个 open 专属字段）。 */
+    private Map<String, Object> toOpenDict(RegionConfig r, String enterpriseAlias) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("region_id", r.getRegionId());
+        m.put("region_alias", r.getRegionAlias());
+        m.put("region_name", r.getRegionName());
+        m.put("status", r.getStatus());
+        m.put("region_type", parseRegionType(r.getRegionType()));
+        m.put("enterprise_id", r.getEnterpriseId());
+        m.put("url", r.getUrl());
+        m.put("scope", resolveScope(r));
+        m.put("provider", r.getProvider());
+        m.put("provider_cluster_id", r.getProviderClusterId());
+        // open 专属
+        m.put("wsurl", r.getWsurl());
+        m.put("httpdomain", r.getHttpdomain());
+        m.put("tcpdomain", r.getTcpdomain());
+        m.put("ssl_ca_cert", r.getSslCaCert());
+        m.put("cert_file", r.getCertFile());
+        m.put("key_file", r.getKeyFile());
+        m.put("desc", r.getDesc());
+        m.put("total_memory", 0);
+        m.put("used_memory", 0);
+        m.put("total_cpu", 0);
+        m.put("used_cpu", 0);
+        m.put("total_disk", 0);
+        m.put("used_disk", 0);
+        m.put("rbd_version", "unknown");
+        m.put("health_status", "ok");
+        m.put("resource_proxy_status", false);
+        m.put("create_time", r.getCreateTime()); // ISO（Jackson 默认），对齐 DRF
+        m.put("enterprise_alias", enterpriseAlias);
+        return m;
+    }
+
+    /** scope = os.getenv("IS_STANDALONE", region.scope)：环境变量优先，否则库值。 */
+    private static String resolveScope(RegionConfig r) {
+        String standalone = System.getenv("IS_STANDALONE");
+        return (standalone != null && !standalone.isEmpty()) ? standalone : r.getScope();
+    }
+
     /** 实时拉取 region 资源（/v2/cluster）、版本（/v2/show）、节点架构（/v2/cluster/nodes），对齐 conver_region_info(check_status=yes)。 */
     @SuppressWarnings("unchecked")
     private void enrichWithRegion(String regionName, Map<String, Object> dict) {

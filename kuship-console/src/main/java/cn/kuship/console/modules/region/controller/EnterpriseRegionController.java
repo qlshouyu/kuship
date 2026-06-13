@@ -27,4 +27,11 @@ public class EnterpriseRegionController {
                                  @RequestParam(value = "check_status", required = false) String checkStatus) {
         return GeneralMessage.list(200, "success", "获取成功", service.listRegions(enterpriseId, status, checkStatus));
     }
+
+    /** GET /console/enterprise/{enterprise_id}/regions/{region_id}（单集群详情，open 级，check_status=False，对齐 EnterpriseRegionsRUDView.get）。 */
+    @GetMapping("/console/enterprise/{enterprise_id}/regions/{region_id}")
+    public ApiResult getRegion(@PathVariable("enterprise_id") String enterpriseId,
+                               @PathVariable("region_id") String regionId) {
+        return GeneralMessage.bean(200, "success", "获取成功", service.getRegion(enterpriseId, regionId));
+    }
 }
