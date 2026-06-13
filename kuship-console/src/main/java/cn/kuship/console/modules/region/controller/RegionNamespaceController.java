@@ -35,4 +35,14 @@ public class RegionNamespaceController {
         return GeneralMessage.bean(200, "success", "获取成功",
                 service.listNamespaceResources(enterpriseId, regionId, content, namespace));
     }
+
+    /** GET /console/enterprise/{enterprise_id}/regions/{region_id}/convert-resource?content=all&namespace= */
+    @GetMapping("/console/enterprise/{enterprise_id}/regions/{region_id}/convert-resource")
+    public ApiResult convertResource(@PathVariable("enterprise_id") String enterpriseId,
+                                     @PathVariable("region_id") String regionId,
+                                     @RequestParam(value = "content", required = false, defaultValue = "all") String content,
+                                     @RequestParam(value = "namespace", required = false, defaultValue = "") String namespace) {
+        return GeneralMessage.bean(200, "success", "获取成功",
+                service.convertResource(enterpriseId, regionId, content, namespace));
+    }
 }

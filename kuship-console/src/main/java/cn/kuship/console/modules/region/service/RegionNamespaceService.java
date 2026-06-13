@@ -68,6 +68,32 @@ public class RegionNamespaceService {
         }
     }
 
+    /**
+     * 命名空间资源转换（对齐 EnterpriseConvertResource.get + region_api.list_convert_resource）：
+     * region /v2/cluster/convert-resource?eid&content&namespace → body.bean，再把 unclassified 键移到末尾。
+     * region 端转换较慢（rainbond 超时 30s），用 IMPORT_BACKUP 档。
+     */
+    @SuppressWarnings("unchecked")
+    public Object convertResource(String enterpriseId, String regionId, String content, String namespace) {
+        RegionConfig region = regionConfigRepository.findByRegionId(regionId)
+                .orElseThrow(() -> ServiceHandleException.notFound("region not found", "数据中心不存在"));
+        String path = "/v2/cluster/convert-resource?eid=" + enc(enterpriseId)
+                + "&content=" + enc(content == null ? "all" : content)
+                + "&namespace=" + enc(namespace);
+        String body = regionClient.exchange(region.getRegionName(), "GET", path, null, TimeoutTier.IMPORT_BACKUP, null);
+        try {
+            Map<String, Object> bean = (Map<String, Object>) MAPPER.readValue(body, Map.class).get("bean");
+            if (bean == null) {
+                return new LinkedHashMap<>();
+            }
+            return moveKeyToEnd(bean, "unclassified");
+        } catch (ServiceHandleException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ServiceHandleException(500, "parse convert-resource failed: " + e.getMessage(), "解析资源转换失败");
+        }
+    }
+
     /** 重建有序 map，把指定键移到末尾（对齐 rainbond data["bean"].pop(k); data["bean"][k]=move）。 */
     private static Map<String, Object> moveKeyToEnd(Map<String, Object> src, String key) {
         Map<String, Object> out = new LinkedHashMap<>();
