@@ -29,9 +29,16 @@ class TeamRoleWriteServiceTest {
     private final RoleInfoRepository roleRepo = mock(RoleInfoRepository.class);
     private final RolePermsRepository permRepo = mock(RolePermsRepository.class);
     private final UserRoleRepository userRoleRepo = mock(UserRoleRepository.class);
-    private final TeamRoleWriteService service = new TeamRoleWriteService(roleRepo, permRepo, userRoleRepo);
+    private final cn.kuship.console.modules.app.repository.ServiceGroupRepository sgRepo =
+            mock(cn.kuship.console.modules.app.repository.ServiceGroupRepository.class);
+    private final TeamRoleWriteService service = new TeamRoleWriteService(roleRepo, permRepo, userRoleRepo, sgRepo);
 
     private static final String TID = "t-uuid";
+
+    @org.junit.jupiter.api.BeforeEach
+    void stubApps() {
+        when(sgRepo.findByTenantId(org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of());
+    }
 
     private static RoleInfo role(int id, String name, String kindId) {
         RoleInfo r = new RoleInfo();

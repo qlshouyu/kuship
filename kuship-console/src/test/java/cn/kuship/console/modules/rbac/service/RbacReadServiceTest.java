@@ -29,9 +29,16 @@ class RbacReadServiceTest {
     private final RoleInfoRepository roleInfoRepo = mock(RoleInfoRepository.class);
     private final UserRoleRepository userRoleRepo = mock(UserRoleRepository.class);
     private final RolePermsRepository rolePermsRepo = mock(RolePermsRepository.class);
+    private final cn.kuship.console.modules.app.repository.ServiceGroupRepository sgRepo =
+            mock(cn.kuship.console.modules.app.repository.ServiceGroupRepository.class);
 
     private final RbacReadService service =
-            new RbacReadService(entPermRepo, roleInfoRepo, userRoleRepo, rolePermsRepo);
+            new RbacReadService(entPermRepo, roleInfoRepo, userRoleRepo, rolePermsRepo, sgRepo);
+
+    @org.junit.jupiter.api.BeforeEach
+    void stubApps() {
+        when(sgRepo.findByTenantId(org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of());
+    }
 
     private static RoleInfo role(int id, String name, String tenantId) {
         RoleInfo r = new RoleInfo();

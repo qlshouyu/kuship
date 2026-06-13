@@ -32,13 +32,16 @@ public class TeamRoleWriteService {
     private final RoleInfoRepository roleInfoRepository;
     private final RolePermsRepository rolePermsRepository;
     private final UserRoleRepository userRoleRepository;
+    private final cn.kuship.console.modules.app.repository.ServiceGroupRepository serviceGroupRepository;
 
     public TeamRoleWriteService(RoleInfoRepository roleInfoRepository,
                                 RolePermsRepository rolePermsRepository,
-                                UserRoleRepository userRoleRepository) {
+                                UserRoleRepository userRoleRepository,
+                                cn.kuship.console.modules.app.repository.ServiceGroupRepository serviceGroupRepository) {
         this.roleInfoRepository = roleInfoRepository;
         this.rolePermsRepository = rolePermsRepository;
         this.userRoleRepository = userRoleRepository;
+        this.serviceGroupRepository = serviceGroupRepository;
     }
 
     private List<String> withDefaultKindIds(String tenantId) {
@@ -127,14 +130,24 @@ public class TeamRoleWriteService {
         return out;
     }
 
-    /** 单角色权限树（对齐 get_role_perms）：bean {role_id(string), permissions}，team_app_manage 按应用重建（无应用→空）。 */
+    /** 单角色权限树（对齐 get_role_perms）：bean {role_id(string), permissions}，team_app_manage 按团队应用重建。 */
     public Map<String, Object> getRolePerms(String tenantId, Integer roleId) {
         RoleInfo role = requireRoleWithDefault(tenantId, roleId);
-        Set<Integer> globalCodes = rolePermsRepository.findByRoleId(role.getId()).stream()
+        List<RolePerms> perms = rolePermsRepository.findByRoleId(role.getId());
+        Set<Integer> globalCodes = perms.stream()
                 .filter(rp -> GLOBAL_APP_ID == (rp.getAppId() == null ? GLOBAL_APP_ID : rp.getAppId()))
                 .map(RolePerms::getPermCode).collect(Collectors.toSet());
+        Map<Integer, Set<Integer>> appCodes = new java.util.HashMap<>();
+        for (RolePerms rp : perms) {
+            int appId = rp.getAppId() == null ? GLOBAL_APP_ID : rp.getAppId();
+            if (appId != GLOBAL_APP_ID) {
+                appCodes.computeIfAbsent(appId, k -> new java.util.HashSet<>()).add(rp.getPermCode());
+            }
+        }
         Map<String, Object> tree = PermsCatalog.packRolePermsTree("team", PermsCatalog.team(), globalCodes, false);
-        applyEmptyAppManage(tree);
+        List<Integer> appIds = serviceGroupRepository.findByTenantId(tenantId).stream()
+                .map(g -> g.getId()).collect(Collectors.toList());
+        PermsCatalog.applyAppManage(tree, appIds, appCodes, false);
         Map<String, Object> bean = new LinkedHashMap<>();
         bean.put("role_id", String.valueOf(role.getId())); // string
         bean.put("permissions", tree);
@@ -175,20 +188,5 @@ public class TeamRoleWriteService {
             m.put("kind", role.getKind());
         }
         return m;
-    }
-
-    @SuppressWarnings("unchecked")
-    private void applyEmptyAppManage(Map<String, Object> tree) {
-        Map<String, Object> teamBody = (Map<String, Object>) tree.get("team");
-        for (Object sub : (List<Object>) teamBody.get("sub_models")) {
-            Map<String, Object> subMap = (Map<String, Object>) sub;
-            if (subMap.containsKey("team_app_manage")) {
-                Map<String, Object> empty = new LinkedHashMap<>();
-                empty.put("sub_models", new ArrayList<>());
-                empty.put("perms", new LinkedHashMap<>());
-                subMap.put("team_app_manage", empty);
-                return;
-            }
-        }
     }
 }

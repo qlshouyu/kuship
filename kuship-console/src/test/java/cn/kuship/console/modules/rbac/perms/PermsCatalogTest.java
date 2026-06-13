@@ -128,7 +128,7 @@ class PermsCatalogTest {
     @Test
     @SuppressWarnings("unchecked")
     void perms_structure_matches_7070_shape() {
-        Map<String, Object> s = PermsCatalog.getPermsStructure();
+        Map<String, Object> s = PermsCatalog.getPermsStructure(java.util.List.of());
         assertThat(s).containsOnlyKeys("team", "enterprise");
         Map<String, Object> team = (Map<String, Object>) s.get("team");
         assertThat((List<Object>) team.get("sub_models")).hasSize(6);

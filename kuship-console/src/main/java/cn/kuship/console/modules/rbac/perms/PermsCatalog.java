@@ -459,24 +459,75 @@ public final class PermsCatalog {
      * {@code team_app_manage} 按团队应用列表重建——kuship 无应用域 → {@code {sub_models:[], perms:[]}}。
      */
     @SuppressWarnings("unchecked")
-    public static Map<String, Object> getPermsStructure() {
+    public static Map<String, Object> getPermsStructure(List<Integer> appIds) {
         Map<String, Object> out = new LinkedHashMap<>();
         Map<String, Object> team = getStructure("team", team());
-        // team_app_manage（sub_models[2]）按应用重建；无应用 → 空 {sub_models:[], perms:[]}
+        // team_app_manage（sub_models[2]）按团队应用重建（对齐 get_perms_structure）。
         List<Object> subs = (List<Object>) ((Map<String, Object>) team.get("team")).get("sub_models");
         for (Object sub : subs) {
             Map<String, Object> subMap = (Map<String, Object>) sub;
             if (subMap.containsKey("team_app_manage")) {
-                Map<String, Object> empty = new LinkedHashMap<>();
-                empty.put("sub_models", new ArrayList<>());
-                empty.put("perms", new ArrayList<>());
-                subMap.put("team_app_manage", empty);
+                if (appIds == null || appIds.isEmpty()) {
+                    // 无应用 → 空 {sub_models:[], perms:[]}
+                    Map<String, Object> empty = new LinkedHashMap<>();
+                    empty.put("sub_models", new ArrayList<>());
+                    empty.put("perms", new ArrayList<>());
+                    subMap.put("team_app_manage", empty);
+                } else {
+                    // app_perms = {"app_<id>": team_app_manage 模板}；team_app_manage = getStructure(app_perms,"app").app
+                    Map<String, Object> appPermsNode = new LinkedHashMap<>();
+                    appPermsNode.put("perms", List.<Perm>of());
+                    Object appManageTemplate = team().get("team_app_manage");
+                    for (Integer appId : appIds) {
+                        appPermsNode.put("app_" + appId, appManageTemplate);
+                    }
+                    subMap.put("team_app_manage", getStructure("app", appPermsNode).get("app"));
+                }
                 break;
             }
         }
         out.put("team", team.get("team"));
         out.put("enterprise", getStructure("enterprise", enterprise()).get("enterprise"));
         return out;
+    }
+
+    /** 单个应用的布尔权限树 body（对齐 get_app_perms_model + pack）。供 team_app_manage 的 app 子模型用。 */
+    public static Object packAppBody(Set<Integer> trueCodes, boolean isOwner) {
+        return packRolePermsTree("app", app(), trueCodes, isOwner).get("app");
+    }
+
+    /**
+     * 按团队应用重建已打包团队树的 team_app_manage（对齐 get_roles_union_perms/get_role_perms 的 app 循环）：
+     * 无应用 → {sub_models:[], perms:{}}；否则每个 app_&lt;id&gt; → 该应用有 role_perms 则 packAppBody(其码)，
+     * 否则复用打包后的默认 team_app_manage 子树。就地替换 sub_models[2].team_app_manage。
+     */
+    @SuppressWarnings("unchecked")
+    public static void applyAppManage(Map<String, Object> tree, List<Integer> appIds,
+                                      Map<Integer, Set<Integer>> appPermsByApp, boolean isOwner) {
+        Map<String, Object> teamBody = (Map<String, Object>) tree.get("team");
+        for (Object sub : (List<Object>) teamBody.get("sub_models")) {
+            Map<String, Object> subMap = (Map<String, Object>) sub;
+            if (!subMap.containsKey("team_app_manage")) {
+                continue;
+            }
+            Object defaultBody = subMap.get("team_app_manage"); // 打包后的默认 team_app_manage 子树
+            Map<String, Object> appNode = new LinkedHashMap<>();
+            List<Object> sm = new ArrayList<>();
+            if (appIds != null) {
+                for (Integer appId : appIds) {
+                    Object body = (appPermsByApp != null && appPermsByApp.containsKey(appId))
+                            ? packAppBody(appPermsByApp.get(appId), isOwner)
+                            : defaultBody;
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("app_" + appId, body);
+                    sm.add(item);
+                }
+            }
+            appNode.put("sub_models", sm);
+            appNode.put("perms", new LinkedHashMap<>());
+            subMap.put("team_app_manage", appNode);
+            return;
+        }
     }
 
     /** 降维结果的一项：权限码 + 应用 id（全局为 -1）。 */

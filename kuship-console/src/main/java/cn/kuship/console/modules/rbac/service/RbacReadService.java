@@ -6,6 +6,8 @@ import cn.kuship.console.modules.rbac.entity.RoleInfo;
 import cn.kuship.console.modules.rbac.entity.RolePerms;
 import cn.kuship.console.modules.rbac.entity.UserRole;
 import cn.kuship.console.modules.rbac.perms.PermsCatalog;
+import cn.kuship.console.modules.app.entity.ServiceGroup;
+import cn.kuship.console.modules.app.repository.ServiceGroupRepository;
 import cn.kuship.console.modules.rbac.repository.RoleInfoRepository;
 import cn.kuship.console.modules.rbac.repository.RolePermsRepository;
 import cn.kuship.console.modules.rbac.repository.UserRoleRepository;
@@ -34,15 +36,18 @@ public class RbacReadService {
     private final RoleInfoRepository roleInfoRepository;
     private final UserRoleRepository userRoleRepository;
     private final RolePermsRepository rolePermsRepository;
+    private final ServiceGroupRepository serviceGroupRepository;
 
     public RbacReadService(EnterpriseUserPermRepository enterpriseUserPermRepository,
                            RoleInfoRepository roleInfoRepository,
                            UserRoleRepository userRoleRepository,
-                           RolePermsRepository rolePermsRepository) {
+                           RolePermsRepository rolePermsRepository,
+                           ServiceGroupRepository serviceGroupRepository) {
         this.enterpriseUserPermRepository = enterpriseUserPermRepository;
         this.roleInfoRepository = roleInfoRepository;
         this.userRoleRepository = userRoleRepository;
         this.rolePermsRepository = rolePermsRepository;
+        this.serviceGroupRepository = serviceGroupRepository;
     }
 
     /** 企业角色名列表（对齐 {@code list_roles}）：enterprise_user_perm.identity 逗号分隔；无记录返回空。 */
@@ -90,14 +95,22 @@ public class RbacReadService {
     /**
      * 用户在某团队下的权限树 tenant_actions（对齐 {@code get_user_perms} → {@code get_roles_union_perms}）：
      * owner 或企业管理员短路为全 true；否则取其团队角色的全局（app_id=-1）权限码并集装配。
-     * {@code team_app_manage} 节点按团队应用列表重建——kuship 暂无应用域，恒为空（见 docs/p1b-7070-reference.md §4）。
+     * {@code team_app_manage} 节点按团队应用（ServiceGroup）重建：owner 各 app 子模型全 true；
+     * 普通成员各 app 子模型按其角色 role_perms 的 app 级码装配，无该 app 码者用默认子树。
      */
     public Map<String, Object> getUserTeamActions(String tenantId, Integer userId, boolean isOwner, boolean isEntAdmin) {
         boolean owner = isOwner || isEntAdmin;
-        Set<Integer> trueCodes = owner ? Set.of() : globalPermCodes(tenantId, userId);
-        Map<String, Object> tree = PermsCatalog.packRolePermsTree("team", PermsCatalog.team(), trueCodes, owner);
-        applyEmptyAppManage(tree);
+        List<RolePerms> userPerms = owner ? List.of() : userTeamRolePerms(tenantId, userId);
+        Set<Integer> globalCodes = owner ? Set.of() : globalCodesOf(userPerms);
+        Map<String, Object> tree = PermsCatalog.packRolePermsTree("team", PermsCatalog.team(), globalCodes, owner);
+        List<Integer> appIds = teamAppIds(tenantId);
+        PermsCatalog.applyAppManage(tree, appIds, owner ? Map.of() : appCodesOf(userPerms), owner);
         return tree;
+    }
+
+    /** 团队全部应用 ID（对齐 get_roles_union_perms 的 ServiceGroup.filter(tenant_id)）。 */
+    private List<Integer> teamAppIds(String tenantId) {
+        return serviceGroupRepository.findByTenantId(tenantId).stream().map(ServiceGroup::getId).collect(Collectors.toList());
     }
 
     /**
@@ -105,11 +118,11 @@ public class RbacReadService {
      * 非成员/无角色返回空集。
      */
     public Set<Integer> teamMemberGlobalPermCodes(String tenantId, Integer userId) {
-        return globalPermCodes(tenantId, userId);
+        return globalCodesOf(userTeamRolePerms(tenantId, userId));
     }
 
-    /** 普通成员：其团队角色的全局（app_id=-1）权限码并集。 */
-    private Set<Integer> globalPermCodes(String tenantId, Integer userId) {
+    /** 用户在某团队角色下的全部 role_perms 行（全局 + 应用级）。 */
+    private List<RolePerms> userTeamRolePerms(String tenantId, Integer userId) {
         List<RoleInfo> teamRoles = roleInfoRepository.findByKindAndKindId(KIND_TEAM, tenantId);
         Set<String> teamRoleIds = teamRoles.stream().map(r -> String.valueOf(r.getId())).collect(Collectors.toSet());
         List<Integer> userTeamRoleIds = userRoleRepository.findByUserId(String.valueOf(userId)).stream()
@@ -117,32 +130,26 @@ public class RbacReadService {
                 .filter(teamRoleIds::contains)
                 .map(Integer::valueOf)
                 .collect(Collectors.toList());
-        if (userTeamRoleIds.isEmpty()) {
-            return Set.of();
-        }
-        return rolePermsRepository.findByRoleIdIn(userTeamRoleIds).stream()
+        return userTeamRoleIds.isEmpty() ? List.of() : rolePermsRepository.findByRoleIdIn(userTeamRoleIds);
+    }
+
+    /** 全局（app_id=-1）权限码并集。 */
+    private Set<Integer> globalCodesOf(List<RolePerms> perms) {
+        return perms.stream()
                 .filter(rp -> GLOBAL_APP_ID == (rp.getAppId() == null ? GLOBAL_APP_ID : rp.getAppId()))
                 .map(RolePerms::getPermCode)
                 .collect(Collectors.toSet());
     }
 
-    /**
-     * 用团队应用列表重建 team_app_manage 节点；kuship 无应用域 → {@code {"sub_models": [], "perms": {}}}。
-     * 对齐 {@code get_roles_union_perms} 对 sub_models[2] 的覆盖。
-     */
-    @SuppressWarnings("unchecked")
-    private void applyEmptyAppManage(Map<String, Object> tree) {
-        Map<String, Object> teamBody = (Map<String, Object>) tree.get("team");
-        List<Object> subs = (List<Object>) teamBody.get("sub_models");
-        for (Object sub : subs) {
-            Map<String, Object> subMap = (Map<String, Object>) sub;
-            if (subMap.containsKey("team_app_manage")) {
-                Map<String, Object> emptyApp = new LinkedHashMap<>();
-                emptyApp.put("sub_models", new ArrayList<>());
-                emptyApp.put("perms", new LinkedHashMap<>());
-                subMap.put("team_app_manage", emptyApp);
-                return;
+    /** 应用级（app_id != -1）权限码，按 app_id 分组。 */
+    private Map<Integer, Set<Integer>> appCodesOf(List<RolePerms> perms) {
+        Map<Integer, Set<Integer>> out = new HashMap<>();
+        for (RolePerms rp : perms) {
+            int appId = rp.getAppId() == null ? GLOBAL_APP_ID : rp.getAppId();
+            if (appId != GLOBAL_APP_ID) {
+                out.computeIfAbsent(appId, k -> new java.util.HashSet<>()).add(rp.getPermCode());
             }
         }
+        return out;
     }
 }
