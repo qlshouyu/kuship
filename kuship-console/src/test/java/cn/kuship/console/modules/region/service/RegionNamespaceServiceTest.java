@@ -42,4 +42,28 @@ class RegionNamespaceServiceTest {
         when(client.exchange(any(), any(), any(), any(), any(), any())).thenReturn("{}");
         assertThat((List<Object>) service.listNamespaces("e1", "rid", "all")).isEmpty();
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void resource_moves_unclassified_to_end() {
+        RegionConfig rc = mock(RegionConfig.class);
+        when(rc.getRegionName()).thenReturn("rainbond");
+        when(repo.findByRegionId("rid")).thenReturn(Optional.of(rc));
+        when(client.exchange(eq("rainbond"), eq("GET"), any(), any(), any(), any()))
+                .thenReturn("{\"bean\":{\"unclassified\":{\"a\":1},\"appA\":{\"b\":2},\"appB\":{\"c\":3}}}");
+        Object bean = service.listNamespaceResources("e1", "rid", "all", "");
+        java.util.List<String> keys = new java.util.ArrayList<>(((java.util.Map<String, Object>) bean).keySet());
+        assertThat(keys).containsExactly("appA", "appB", "unclassified");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void resource_empty_when_bean_null() {
+        RegionConfig rc = mock(RegionConfig.class);
+        when(rc.getRegionName()).thenReturn("rainbond");
+        when(repo.findByRegionId("rid")).thenReturn(Optional.of(rc));
+        when(client.exchange(any(), any(), any(), any(), any(), any())).thenReturn("{}");
+        assertThat((java.util.Map<String, Object>) service.listNamespaceResources("e1", "rid", "all", ""))
+                .isEmpty();
+    }
 }
