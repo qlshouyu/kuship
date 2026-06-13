@@ -10,6 +10,9 @@ public interface RegionConfigRepository extends JpaRepository<RegionConfig, Inte
 
     Optional<RegionConfig> findByRegionName(String regionName);
 
+    /** 按 region_id(uuid) 查（region 端点路径用 region_id，调用用 region_name）。 */
+    Optional<RegionConfig> findByRegionId(String regionId);
+
     /** 企业集群列表（按 id 升序）。 */
     List<RegionConfig> findByEnterpriseIdOrderById(String enterpriseId);
 
