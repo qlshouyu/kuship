@@ -7,7 +7,16 @@ import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.ssl.DefaultHostnameVerifier;
+import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
 import org.apache.hc.core5.http.ContentType;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.openssl.PEMKeyPair;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.util.TimeValue;
@@ -16,8 +25,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import java.io.StringReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -76,7 +92,7 @@ public class RegionClient {
                            TimeoutTier tier, String enterpriseToken) {
         RegionEndpoint endpoint = resolveEndpoint(regionName);
         String token = chooseAuthToken(enterpriseToken, endpoint);
-        String url = endpoint.url() + path;
+        String url = baseUrl(endpoint) + path;
 
         HttpUriRequestBase request = new HttpUriRequestBase(method, URI.create(url));
         if (token != null) {
@@ -113,13 +129,91 @@ public class RegionClient {
                 .build();
     }
 
-    /** 按 region url 缓存 HttpClient（含默认重试策略）。 */
-    private CloseableHttpClient clientFor(RegionEndpoint endpoint) {
-        return clientCache.computeIfAbsent(endpoint.url(), url -> HttpClients.custom()
-                .setRetryStrategy(new DefaultHttpRequestRetryStrategy(
-                        properties.getRetryCount(), TimeValue.ofSeconds(1)))
-                .build());
-        // NOTE: 双向 TLS / 自签证书信任（ssl_ca_cert / cert_file / key_file，BouncyCastle 解析 PEM）
-        //       在对接真实 region-api 时按 endpoint.hasMutualTls() 接入，作为本骨架的扩展点。
+    /** 实际请求基地址：urlOverride 配置非空时优先（开发环境集群内 DNS 不可达），否则 region_info.url。 */
+    private String baseUrl(RegionEndpoint endpoint) {
+        String override = properties.getUrlOverride();
+        return (override != null && !override.isBlank()) ? override : endpoint.url();
     }
+
+    /** 按 region url 缓存 HttpClient（含默认重试策略 + 双向 TLS）。 */
+    private CloseableHttpClient clientFor(RegionEndpoint endpoint) {
+        return clientCache.computeIfAbsent(baseUrl(endpoint), url -> {
+            var builder = HttpClients.custom().setRetryStrategy(
+                    new DefaultHttpRequestRetryStrategy(properties.getRetryCount(), TimeValue.ofSeconds(1)));
+            if (endpoint.hasMutualTls()) {
+                SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
+                        buildSslContext(endpoint),
+                        properties.isSslVerify() ? new DefaultHostnameVerifier()
+                                : NoopHostnameVerifier.INSTANCE);
+                builder.setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
+                        .setSSLSocketFactory(sslsf).build());
+            }
+            return builder.build();
+        });
+    }
+
+    /**
+     * 由 region_info 的 PEM（ssl_ca_cert / cert_file / key_file）构建双向 TLS SSLContext：
+     * 客户端证书+私钥（PKCS1，BouncyCastle 解析）放入 KeyStore；sslVerify=false 时信任所有服务端证书（自签）。
+     */
+    private SSLContext buildSslContext(RegionEndpoint endpoint) {
+        try {
+            X509Certificate clientCert = parseCert(endpoint.certFile());
+            PrivateKey clientKey = parseKey(endpoint.keyFile());
+            KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+            ks.load(null, null);
+            ks.setKeyEntry("client", clientKey, new char[0], new X509Certificate[]{clientCert});
+            javax.net.ssl.KeyManagerFactory kmf = javax.net.ssl.KeyManagerFactory.getInstance(
+                    javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
+            kmf.init(ks, new char[0]);
+
+            TrustManager[] trust;
+            if (properties.isSslVerify()) {
+                KeyStore ts = KeyStore.getInstance(KeyStore.getDefaultType());
+                ts.load(null, null);
+                ts.setCertificateEntry("ca", parseCert(endpoint.sslCaCert()));
+                javax.net.ssl.TrustManagerFactory tmf = javax.net.ssl.TrustManagerFactory.getInstance(
+                        javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());
+                tmf.init(ts);
+                trust = tmf.getTrustManagers();
+            } else {
+                trust = new TrustManager[]{TRUST_ALL};
+            }
+            SSLContext ctx = SSLContext.getInstance("TLS");
+            ctx.init(kmf.getKeyManagers(), trust, null);
+            return ctx;
+        } catch (Exception e) {
+            throw new ServiceHandleException(500, "region tls init failed: " + e.getMessage(), "集群证书初始化失败");
+        }
+    }
+
+    private static X509Certificate parseCert(String pem) throws Exception {
+        try (PEMParser parser = new PEMParser(new StringReader(pem))) {
+            Object o = parser.readObject();
+            return new JcaX509CertificateConverter().getCertificate((X509CertificateHolder) o);
+        }
+    }
+
+    private static PrivateKey parseKey(String pem) throws Exception {
+        try (PEMParser parser = new PEMParser(new StringReader(pem))) {
+            Object o = parser.readObject();
+            JcaPEMKeyConverter conv = new JcaPEMKeyConverter();
+            if (o instanceof PEMKeyPair kp) {
+                return conv.getKeyPair(kp).getPrivate();
+            }
+            return conv.getPrivateKey((org.bouncycastle.asn1.pkcs.PrivateKeyInfo) o);
+        }
+    }
+
+    private static final X509TrustManager TRUST_ALL = new X509TrustManager() {
+        public void checkClientTrusted(X509Certificate[] chain, String authType) {
+        }
+
+        public void checkServerTrusted(X509Certificate[] chain, String authType) {
+        }
+
+        public X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
+        }
+    };
 }

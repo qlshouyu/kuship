@@ -18,27 +18,86 @@ import java.util.Map;
 @Service
 public class EnterpriseRegionReadService {
 
+    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
     private final RegionConfigRepository regionConfigRepository;
     private final TenantEnterpriseRepository enterpriseRepository;
+    private final cn.kuship.console.infrastructure.region.RegionClient regionClient;
 
     public EnterpriseRegionReadService(RegionConfigRepository regionConfigRepository,
-                                       TenantEnterpriseRepository enterpriseRepository) {
+                                       TenantEnterpriseRepository enterpriseRepository,
+                                       cn.kuship.console.infrastructure.region.RegionClient regionClient) {
         this.regionConfigRepository = regionConfigRepository;
         this.enterpriseRepository = enterpriseRepository;
+        this.regionClient = regionClient;
     }
 
-    /** 企业集群列表（safe 级，资源默认）。status 非空时按状态过滤。 */
-    public List<Map<String, Object>> listRegions(String enterpriseId, String status) {
+    /** 企业集群列表。status 非空按状态过滤；checkStatus="yes" 时实时拉取 region 资源/版本/节点（对齐 conver_region_info）。 */
+    public List<Map<String, Object>> listRegions(String enterpriseId, String status, String checkStatus) {
         List<RegionConfig> regions = (status == null || status.isBlank())
                 ? regionConfigRepository.findByEnterpriseIdOrderById(enterpriseId)
                 : regionConfigRepository.findByEnterpriseIdAndStatusOrderById(enterpriseId, status);
         String enterpriseAlias = enterpriseRepository.findByEnterpriseId(enterpriseId)
                 .map(TenantEnterprise::getEnterpriseAlias).orElse(null);
+        boolean check = "yes".equals(checkStatus);
         List<Map<String, Object>> out = new ArrayList<>();
         for (RegionConfig r : regions) {
-            out.add(toSafeDict(r, enterpriseAlias));
+            Map<String, Object> dict = toSafeDict(r, enterpriseAlias);
+            if (check) {
+                enrichWithRegion(r.getRegionName(), dict);
+            }
+            out.add(dict);
         }
         return out;
+    }
+
+    /** 实时拉取 region 资源（/v2/cluster）、版本（/v2/show）、节点架构（/v2/cluster/nodes），对齐 conver_region_info(check_status=yes)。 */
+    @SuppressWarnings("unchecked")
+    private void enrichWithRegion(String regionName, Map<String, Object> dict) {
+        try {
+            String rbdVersion = regionClient.exchange(regionName, "GET", "/v2/show", null,
+                    cn.kuship.console.infrastructure.region.TimeoutTier.NORMAL, null);
+            String clusterBody = regionClient.exchange(regionName, "GET", "/v2/cluster", null,
+                    cn.kuship.console.infrastructure.region.TimeoutTier.NORMAL, null);
+            Map<String, Object> bean = (Map<String, Object>) MAPPER.readValue(clusterBody, Map.class).get("bean");
+            dict.put("total_memory", bean.get("cap_mem"));
+            dict.put("used_memory", bean.get("req_mem"));
+            dict.put("total_cpu", bean.get("cap_cpu"));
+            dict.put("used_cpu", bean.get("req_cpu"));
+            dict.put("total_disk", toLong(bean.get("cap_disk")) / 1024.0 / 1024 / 1024);
+            dict.put("used_disk", toLong(bean.get("req_disk")) / 1024.0 / 1024 / 1024);
+            dict.put("rbd_version", rbdVersion == null ? "" : rbdVersion.trim());
+            dict.put("resource_proxy_status", bean.get("resource_proxy_status"));
+            dict.put("k8s_version", bean.get("k8s_version"));
+            dict.put("all_nodes", bean.get("all_node"));
+            Map<String, Object> servicesStatus = new LinkedHashMap<>();
+            servicesStatus.put("running", bean.get("run_pod_number"));
+            dict.put("services_status", servicesStatus);
+            dict.put("pods", bean.get("pods"));
+            dict.put("run_pod_number", bean.get("run_pod_number"));
+            dict.put("node_ready", bean.get("node_ready"));
+            // 节点架构
+            String nodesBody = regionClient.exchange(regionName, "GET", "/v2/cluster/nodes", null,
+                    cn.kuship.console.infrastructure.region.TimeoutTier.NORMAL, null);
+            List<Object> nodes = (List<Object>) MAPPER.readValue(nodesBody, Map.class).getOrDefault("list", List.of());
+            java.util.LinkedHashSet<String> arch = new java.util.LinkedHashSet<>();
+            for (Object n : nodes) {
+                Object a = ((Map<String, Object>) n).get("architecture");
+                if (a != null) {
+                    arch.add(a.toString());
+                }
+            }
+            dict.put("arch", new ArrayList<>(arch));
+        } catch (Exception e) {
+            // 对齐 conver_region_info 异常分支
+            dict.put("rbd_version", "");
+            dict.put("health_status", "failure");
+        }
+    }
+
+    private static long toLong(Object o) {
+        return o instanceof Number n ? n.longValue() : 0L;
     }
 
     private Map<String, Object> toSafeDict(RegionConfig r, String enterpriseAlias) {

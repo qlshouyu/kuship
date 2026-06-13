@@ -36,6 +36,8 @@ kuship:
     expiration-days: 3650
   region:
     ssl-verify: ${REGION_SSL_VERIFY:false}
+    # region-api 基地址覆盖（开发环境 region_info.url 为集群内 DNS 不可达时用）
+    url-override: ${REGION_URL_OVERRIDE:}
 
 management:
   endpoints:

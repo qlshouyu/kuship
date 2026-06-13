@@ -14,6 +14,17 @@ public class RegionProperties {
     /** 默认重试次数。 */
     private int retryCount = 2;
 
+    /** region-api 基地址覆盖（开发环境 region_info.url 为集群内 DNS 不可达时用，如 https://localhost:8443）。 */
+    private String urlOverride = "";
+
+    public String getUrlOverride() {
+        return urlOverride;
+    }
+
+    public void setUrlOverride(String urlOverride) {
+        this.urlOverride = urlOverride;
+    }
+
     public boolean isSslVerify() {
         return sslVerify;
     }

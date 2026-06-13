@@ -23,7 +23,8 @@ public class EnterpriseRegionController {
     /** GET /console/enterprise/{enterprise_id}/regions?status= */
     @GetMapping("/console/enterprise/{enterprise_id}/regions")
     public ApiResult listRegions(@PathVariable("enterprise_id") String enterpriseId,
-                                 @RequestParam(value = "status", required = false) String status) {
-        return GeneralMessage.list(200, "success", "获取成功", service.listRegions(enterpriseId, status));
+                                 @RequestParam(value = "status", required = false) String status,
+                                 @RequestParam(value = "check_status", required = false) String checkStatus) {
+        return GeneralMessage.list(200, "success", "获取成功", service.listRegions(enterpriseId, status, checkStatus));
     }
 }

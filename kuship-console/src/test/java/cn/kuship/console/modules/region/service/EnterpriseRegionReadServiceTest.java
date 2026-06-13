@@ -19,7 +19,8 @@ class EnterpriseRegionReadServiceTest {
 
     private final RegionConfigRepository regionRepo = mock(RegionConfigRepository.class);
     private final TenantEnterpriseRepository entRepo = mock(TenantEnterpriseRepository.class);
-    private final EnterpriseRegionReadService service = new EnterpriseRegionReadService(regionRepo, entRepo);
+    private final cn.kuship.console.infrastructure.region.RegionClient regionClient = mock(cn.kuship.console.infrastructure.region.RegionClient.class);
+    private final EnterpriseRegionReadService service = new EnterpriseRegionReadService(regionRepo, entRepo, regionClient);
 
     private static RegionConfig region(String type) {
         RegionConfig r = mock(RegionConfig.class);
@@ -45,7 +46,7 @@ class EnterpriseRegionReadServiceTest {
         e.setEnterpriseAlias("KuShip");
         when(entRepo.findByEnterpriseId("e1")).thenReturn(Optional.of(e));
 
-        Map<String, Object> m = service.listRegions("e1", null).get(0);
+        Map<String, Object> m = service.listRegions("e1", null, null).get(0);
         assertThat(m).containsEntry("region_name", "rainbond").containsEntry("region_alias", "默认集群")
                 .containsEntry("scope", "default").containsEntry("enterprise_alias", "KuShip");
         // 资源默认
@@ -63,7 +64,7 @@ class EnterpriseRegionReadServiceTest {
         RegionConfig rc = region("[\"x\",\"y\"]");
         when(regionRepo.findByEnterpriseIdOrderById("e1")).thenReturn(List.of(rc));
         when(entRepo.findByEnterpriseId("e1")).thenReturn(Optional.empty());
-        Map<String, Object> m = service.listRegions("e1", null).get(0);
+        Map<String, Object> m = service.listRegions("e1", null, null).get(0);
         assertThat((List<Object>) m.get("region_type")).containsExactly("x", "y");
         assertThat(m).containsEntry("enterprise_alias", null);
     }
@@ -73,6 +74,6 @@ class EnterpriseRegionReadServiceTest {
         RegionConfig rc = region(null);
         when(regionRepo.findByEnterpriseIdAndStatusOrderById("e1", "1")).thenReturn(List.of(rc));
         when(entRepo.findByEnterpriseId("e1")).thenReturn(Optional.empty());
-        assertThat(service.listRegions("e1", "1")).hasSize(1);
+        assertThat(service.listRegions("e1", "1", null)).hasSize(1);
     }
 }
