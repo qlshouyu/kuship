@@ -234,4 +234,5 @@ public class TenantServiceInfo {
     public String getExtendMethod() { return extendMethod; }
     public String getK8sComponentName() { return k8sComponentName; }
     public String getServiceSource() { return serviceSource; }
+    public String getCreateStatus() { return createStatus; }
 }
