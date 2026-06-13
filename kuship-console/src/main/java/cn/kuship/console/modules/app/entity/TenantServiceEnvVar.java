@@ -38,4 +38,23 @@ public class TenantServiceEnvVar {
     public String getName() { return name; }
     public String getAttrName() { return attrName; }
     public String getAttrValue() { return attrValue; }
+
+    /**
+     * 对齐 AppEnvView 的 env_dict（raw cursor 顺序）：is_change 为**整数 0/1**（raw 游标返回 tinyint 为 int），
+     * create_time 为 ISO 微秒（Jackson 默认 LocalDateTime，匹配 DRF）。
+     */
+    public java.util.Map<String, Object> toEnvDict() {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("ID", id);
+        m.put("tenant_id", tenantId);
+        m.put("service_id", serviceId);
+        m.put("container_port", containerPort);
+        m.put("name", name);
+        m.put("attr_name", attrName);
+        m.put("attr_value", attrValue);
+        m.put("is_change", Boolean.TRUE.equals(isChange) ? 1 : 0);
+        m.put("scope", scope);
+        m.put("create_time", createTime);
+        return m;
+    }
 }
