@@ -235,4 +235,6 @@ public class TenantServiceInfo {
     public String getK8sComponentName() { return k8sComponentName; }
     public String getServiceSource() { return serviceSource; }
     public String getCreateStatus() { return createStatus; }
+    public String getServiceCname() { return serviceCname; }
+    public String getServiceType() { return serviceType; }
 }
