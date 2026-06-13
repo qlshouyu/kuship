@@ -142,4 +142,20 @@ public class RegionConfig {
     public String getProvider() {
         return provider;
     }
+
+    public String getRegionType() {
+        return regionType;
+    }
+
+    public String getDesc() {
+        return desc;
+    }
+
+    public String getScope() {
+        return scope;
+    }
+
+    public String getProviderClusterId() {
+        return providerClusterId;
+    }
 }
