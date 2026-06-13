@@ -35,6 +35,9 @@ public class TenantServiceInfo {
     @Column(name = "extend_method", length = 32)
     private String extendMethod;
 
+    @Column(name = "k8s_component_name", length = 64)
+    private String k8sComponentName;
+
     public Integer getId() { return id; }
     public String getServiceId() { return serviceId; }
     public String getServiceAlias() { return serviceAlias; }
@@ -42,4 +45,5 @@ public class TenantServiceInfo {
     public String getServiceRegion() { return serviceRegion; }
     public String getCheckUuid() { return checkUuid; }
     public String getExtendMethod() { return extendMethod; }
+    public String getK8sComponentName() { return k8sComponentName; }
 }
