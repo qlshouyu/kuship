@@ -12,4 +12,7 @@ public interface TenantServiceInfoRepository extends JpaRepository<TenantService
     Optional<TenantServiceInfo> findByServiceAlias(String serviceAlias);
 
     List<TenantServiceInfo> findByServiceIdIn(java.util.Collection<String> serviceIds);
+
+    /** 团队某 region 下全部组件（对齐 get_tenant_region_services）。 */
+    List<TenantServiceInfo> findByTenantIdAndServiceRegion(String tenantId, String serviceRegion);
 }
