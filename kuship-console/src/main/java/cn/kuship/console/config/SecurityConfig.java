@@ -3,6 +3,7 @@ package cn.kuship.console.config;
 import cn.kuship.console.common.security.JwtAuthenticationFilter;
 import cn.kuship.console.common.security.RestAccessDeniedHandler;
 import cn.kuship.console.common.security.RestAuthenticationEntryPoint;
+import jakarta.servlet.DispatcherType;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,6 +41,10 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // 放行 ERROR dispatch：未映射端点 404 转发 /error 时 OncePerRequestFilter 不重跑、
+                        // 认证为空，若不放行会命中 entry point 误返 401/10405，导致前端对"未实现接口"误判为
+                        // 需重新登录而回环。放行后未实现端点正常返回 404。
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e
