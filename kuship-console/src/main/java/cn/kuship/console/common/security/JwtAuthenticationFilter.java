@@ -113,7 +113,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void write401(HttpServletResponse response, String msg, String msgShow) throws IOException {
-        ApiResult body = GeneralMessage.message(401, msg, msgShow);
+        // body code 用 10405（对齐 rainbond「需要登录」契约：JWTAuthApiView 认证失败均返 10405），
+        // 前端 request.js 据此触发 showNeedLogin → 跳转登录；HTTP 状态仍 401。
+        ApiResult body = GeneralMessage.message(10405, msg, msgShow);
         response.setStatus(401);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
