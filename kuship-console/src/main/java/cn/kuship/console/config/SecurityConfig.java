@@ -22,6 +22,7 @@ public class SecurityConfig {
     /** 放行的匿名端点（显式完整 /console 路径）。 */
     static final String[] PUBLIC_PATHS = {
             "/console/users/login",
+            "/console/config/info",
             "/console/healthz",
             "/actuator/health",
             "/actuator/info"
