@@ -19,8 +19,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class SecurityConfig {
 
-    /** 放行的匿名端点（显式完整 /console 路径）。 */
-    static final String[] PUBLIC_PATHS = {
+    /** 放行的匿名端点（显式完整 /console 路径）。public 供 JwtAuthenticationFilter 跳过校验。 */
+    public static final String[] PUBLIC_PATHS = {
             "/console/users/login",
             "/console/config/info",
             "/console/healthz",

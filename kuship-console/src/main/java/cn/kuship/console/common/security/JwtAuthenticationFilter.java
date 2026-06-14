@@ -49,6 +49,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 公开路径（login/config/info/healthz 等）跳过 token 校验：
+     * 浏览器可能携带过期/无效的 cookie token 访问这些匿名端点，若仍校验会误返 401（对齐 rainbond AllowAny）。
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        for (String p : cn.kuship.console.config.SecurityConfig.PUBLIC_PATHS) {
+            if (uri.equals(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
