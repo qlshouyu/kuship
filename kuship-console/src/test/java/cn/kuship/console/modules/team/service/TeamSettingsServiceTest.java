@@ -53,10 +53,21 @@ class TeamSettingsServiceTest {
     @Test
     void transfer_owner_sets_creater() {
         Tenants t = team(700002);
+        when(permRel.findByTenantId(1)).thenReturn(List.of(member(700003)));
         when(tenantsRepo.save(any())).thenAnswer(i -> i.getArgument(0));
         service.transferOwnership(t, 700002, 700003);
         assertThat(t.getCreater()).isEqualTo(700003);
         verify(tenantsRepo).save(t);
+    }
+
+    @Test
+    void transfer_to_non_member_404() {
+        Tenants t = team(700002);
+        when(permRel.findByTenantId(1)).thenReturn(List.of(member(700002)));
+        assertThatThrownBy(() -> service.transferOwnership(t, 700002, 99999999))
+                .isInstanceOf(ServiceHandleException.class)
+                .satisfies(e -> assertThat(((ServiceHandleException) e).getStatus()).isEqualTo(404));
+        verify(tenantsRepo, never()).save(any());
     }
 
     @Test
@@ -102,6 +113,14 @@ class TeamSettingsServiceTest {
         service.exitTeam(t, 700003);
         verify(permRel).deleteByUserIdInAndTenantId(List.of(700003), 1);
         verify(userRoleRepo).deleteByUserIdAndRoleIdIn(eq("700003"), anyList());
+    }
+
+    private static cn.kuship.console.modules.team.entity.PermRelTenant member(int userId) {
+        cn.kuship.console.modules.team.entity.PermRelTenant p =
+                new cn.kuship.console.modules.team.entity.PermRelTenant();
+        p.setUserId(userId);
+        p.setTenantId(1);
+        return p;
     }
 
     private static RoleInfo roleInfo(int id) {

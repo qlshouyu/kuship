@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"ls /Users/egojit/workspace/my_project/kuship/kuship-console/docs/ 2>/dev/null | head -80; echo ===; ls /Users/egojit/workspace/my_project/kuship/openspec/changes/archive/ | head -40\",\"desc...",
+  "error": "Exit code 1\n(eval):1: == not found",
+  "timestamp": "2026-07-18T09:20:35.575Z",
+  "retry_count": 2
+}

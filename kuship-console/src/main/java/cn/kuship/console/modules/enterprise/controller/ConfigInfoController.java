@@ -19,6 +19,8 @@ public class ConfigInfoController {
     /** GET /console/config/info （公开）。 */
     @GetMapping("/console/config/info")
     public ApiResult configInfo() {
-        return GeneralMessage.bean(200, "query success", "Logo获取成功", service.getConfigInfo());
+        // data 顶层补 initialize_info（对齐 7070 ConfigRUDView：未初始化时为 null）
+        return GeneralMessage.bean(200, "query success", "Logo获取成功", service.getConfigInfo())
+                .putExtra("initialize_info", null);
     }
 }

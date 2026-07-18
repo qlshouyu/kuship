@@ -1,0 +1,328 @@
+/* eslint-disable react/sort-comp */
+/* eslint-disable no-param-reassign */
+/* eslint-disable consistent-return */
+import NewbieGuiding from '@/components/NewbieGuiding';
+import { Col, Divider, Dropdown, Menu, Row } from 'antd';
+import { connect } from 'dva';
+import { routerRedux } from 'dva/router';
+import React, { PureComponent } from 'react';
+import { FormattedMessage } from 'umi';
+import { formatMessage } from '@/utils/intl';
+import BaseAddCluster from '../../components/Cluster/BaseAddCluster';
+import CustomClusterAdd from '../../components/Cluster/CustomClusterAdd';
+import PageHeaderLayout from '../../layouts/PageHeaderLayout';
+import globalUtil from '../../utils/global';
+import userUtil from '../../utils/user';
+import pageheaderSvg from '@/utils/pageHeaderSvg';
+import styles from './index.less';
+
+@connect(({ user }) => ({
+  user: user.currentUser
+}))
+export default class EnterpriseClusters extends PureComponent {
+  constructor(props) {
+    super(props);
+    const { user } = this.props;
+    const adminer = userUtil.isCompanyAdmin(user);
+    this.state = {
+      adminer,
+      addClusterShow: false,
+      addCustomClusterShow: false,
+      guideStep: 2,
+      clusters: null
+    };
+  }
+  componentWillMount() {
+    const { adminer } = this.state;
+    const { dispatch } = this.props;
+
+    if (!adminer) {
+      dispatch(routerRedux.push(`/`));
+    }
+  }
+  componentDidMount() {
+    this.loadClusters();
+  }
+
+  loadClusters = () => {
+    const {
+      dispatch,
+      match: {
+        params: { eid }
+      }
+    } = this.props;
+    dispatch({
+      type: 'region/fetchEnterpriseClusters',
+      payload: {
+        enterprise_id: eid
+      },
+      callback: res => {
+        if (res && res.list) {
+          const clusters = [];
+          res.list.map((item, index) => {
+            item.key = `cluster${index}`;
+            clusters.push(item);
+            return item;
+          });
+          this.setState({ clusters });
+        } else {
+          this.setState({ clusters: [] });
+        }
+      }
+    });
+  };
+  cancelAddCluster = () => {
+    this.setState({ addClusterShow: false });
+  };
+  cancelAddCustomCluster = () => {
+    this.setState({ addCustomClusterShow: false });
+  };
+  // add Cluster
+  addClusterShow = () => {
+    this.setState({
+      addClusterShow: true
+    });
+  };
+  toClusterList = provider => {
+    const { dispatch } = this.props;
+    const {
+      match: {
+        params: { eid }
+      }
+    } = this.props;
+    const TOCLUSTERLIST_PATHS = {
+      initializing: '/enterprise/{eid}/provider/{provider}/kclusters/append?event_id={eventId}',
+      initialized: '/enterprise/{eid}/provider/{provider}/kclusters?event_id={eventId}',
+      installing: '/enterprise/{eid}/provider/{provider}/kclusters?type=installing&event_id={eventId}',
+      installed: '/enterprise/{eid}/provider/{provider}/kclusters?event_id={eventId}',
+      integrating: '/enterprise/{eid}/provider/{provider}/kclusters/init?event_id={eventId}',
+      integrated: '/enterprise/{eid}/provider/{provider}/kclusters/check?event_id={eventId}',
+    };
+    dispatch({
+      type: 'region/fetchClusterInfo',
+      payload: {
+        cluster_id: ''
+      },
+      callback: res => {
+        if (res && res.status_code === 200) {
+          window.localStorage.setItem('event_id', res.bean.event_id)
+          const status = res.bean.create_status;
+          let path = TOCLUSTERLIST_PATHS[status] || TOCLUSTERLIST_PATHS.initializing;
+          path = path.replace('{eid}', eid).replace('{provider}', provider);
+          if (path.includes('{eventId}')) {
+            path = path.replace('{eventId}', res.bean.event_id);
+          }
+          dispatch(routerRedux.push(path));
+        }
+      }
+    });
+  };
+  handleInstallRegion = type => {
+    const {
+      dispatch,
+      match: {
+        params: { eid }
+      }
+    } = this.props;
+    switch (type) {
+      case 'helm':
+        dispatch(routerRedux.push(`/enterprise/${eid}/provider/ACksterList`));
+        break;
+      case 'aliyun':
+        dispatch(routerRedux.push(`/enterprise/${eid}/provider/ACksterList?mode=ack`));
+        break;
+      case 'tencent':
+        dispatch(routerRedux.push(`/enterprise/${eid}/provider/ACksterList?mode=tencent`));
+        break;
+      case 'huawei':
+        dispatch(routerRedux.push(`/enterprise/${eid}/provider/ACksterList?mode=huawei`));
+        break;
+      default:
+        break;
+    }
+  };
+  addClusterOK = () => {
+    const { dispatch } = this.props;
+    const {
+      match: {
+        params: { eid }
+      }
+    } = this.props;
+    dispatch(routerRedux.push(`/enterprise/${eid}/clusters`));
+  };
+
+  handleGuideStep = guideStep => {
+    this.setState({
+      guideStep
+    });
+  };
+  handleNewbieGuiding = info => {
+    const { prevStep, nextStep } = info;
+    return (
+      <NewbieGuiding
+        {...info}
+        totals={14}
+        handleClose={() => {
+          this.handleGuideStep('close');
+        }}
+        handlePrev={() => {
+          if (prevStep) {
+            this.handleGuideStep(prevStep);
+          }
+        }}
+        handleNext={() => {
+          if (nextStep) {
+            this.toClusterList('rke');
+            this.handleGuideStep(nextStep);
+            if (nextStep === 4) {
+              document.getElementById('cloudServiceBtn').scrollIntoView();
+            }
+          }
+        }}
+      />
+    );
+  };
+
+  render() {
+    const {
+      addClusterShow,
+      addCustomClusterShow,
+      guideStep,
+      clusters
+    } = this.state;
+    const {
+      match: {
+        params: { eid }
+      }
+    } = this.props;
+
+    const menu = (
+      <Menu>
+        <Menu.Item>
+          <a
+            onClick={e => {
+              e.preventDefault();
+              this.addClusterShow();
+            }}
+          >
+            <FormattedMessage id='enterpriseColony.addCluster.cluster' />
+          </a>
+        </Menu.Item>
+      </Menu>
+    );
+    const extraContent = (
+      <div>
+        <Dropdown overlay={menu} placement="bottomRight">
+          {globalUtil.fetchSvg('omitIcon')}
+        </Dropdown>
+      </div>
+    );
+    return (
+      <PageHeaderLayout
+        title={<FormattedMessage id='enterpriseColony.button.text' />}
+        content={<FormattedMessage id='enterpriseColony.PageHeaderLayout.content' />}
+        extraContent={extraContent}
+        titleSvg={pageheaderSvg.getPageHeaderSvg('clusters', 18)}
+      >
+        <div style={{ marginBottom: '16px' }}>
+          <h3><FormattedMessage id='enterpriseColony.addCluster.infrastructure' /></h3>
+          <Row>
+            <Col span={12}>
+              <div
+                onClick={() => this.toClusterList('rke')}
+                className={styles.import}
+              >
+                <div className={styles.importicon}>{globalUtil.fetchSvg('hostIcon')}</div>
+                <div className={styles.importDesc}>
+                  <h3><FormattedMessage id='enterpriseColony.addCluster.host' /></h3>
+                  <p><FormattedMessage id='enterpriseColony.addCluster.automatically' /></p>
+                </div>
+              </div>
+              {guideStep === 2 &&
+                clusters &&
+                clusters.length === 0 &&
+                this.handleNewbieGuiding({
+                  tit: formatMessage({ id: 'enterpriseColony.addCluster.install' }),
+                  configName: 'hostInstall',
+                  desc: formatMessage({ id: 'enterpriseColony.addCluster.common' }),
+                  nextStep: 3,
+                  svgPosition: { marginLeft: '58px' }
+                })}
+            </Col>
+            <Col span={12}>
+              <div
+                onClick={() => {
+                  this.handleInstallRegion('helm');
+                }}
+                className={styles.import}
+              >
+                <div className={styles.importicon}>{globalUtil.fetchSvg('kubernetesIcon')}</div>
+                <div className={styles.importDesc}>
+                  <h3><FormattedMessage id='enterpriseColony.addCluster.colony' /></h3>
+                  <p><FormattedMessage id='enterpriseColony.addCluster.management' /></p>
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </div>
+        <div>
+          <h3><FormattedMessage id='enterpriseColony.addCluster.service' /></h3>
+          <Row style={{ display: 'flex', justifyContent: 'space-around' }}>
+            <Col style={{ width: '33%' }}>
+              <div
+                onClick={() => {
+                  this.handleInstallRegion('aliyun');
+                }}
+                className={styles.import}
+              >
+                <div className={styles.importicon}>{globalUtil.fetchSvg('aliIcon')}</div>
+                <div className={styles.importDesc}>
+                  <h3><FormattedMessage id='enterpriseColony.addCluster.ali' /></h3>
+                  <p><FormattedMessage id='enterpriseColony.addCluster.manage' /></p>
+                </div>
+              </div>
+            </Col>
+            <Col style={{ width: '33%' }}>
+              <div
+                onClick={() => {
+                  this.handleInstallRegion('huawei');
+                }}
+                className={styles.import}
+              >
+                <div className={styles.importicon}>{globalUtil.fetchSvg('huaweiIcon')}</div>
+                <div className={styles.importDesc}>
+                  <h3><FormattedMessage id='enterpriseColony.addCluster.huawei' /></h3>
+                  <p><FormattedMessage id='enterpriseColony.addCluster.Docking' /></p>
+                </div>
+              </div>
+            </Col>
+            <Col style={{ width: '33%' }}>
+              <div
+                onClick={() => {
+                  this.handleInstallRegion('tencent');
+                }}
+                className={styles.import}
+              >
+                <div className={styles.importicon}>{globalUtil.fetchSvg('tencentIcon')}</div>
+                <div className={styles.importDesc}>
+                  <h3><FormattedMessage id='enterpriseColony.addCluster.tenxun' /></h3>
+                  <p><FormattedMessage id='enterpriseColony.addCluster.clusters' /></p>
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </div>
+        {addClusterShow && (
+          <BaseAddCluster
+            eid={eid}
+            onOk={this.addClusterOK}
+            onCancel={this.cancelAddCluster}
+          />
+        )}
+        {addCustomClusterShow && (
+          <CustomClusterAdd eid={eid} onCancel={this.cancelAddCustomCluster} />
+        )}
+      </PageHeaderLayout>
+    );
+  }
+}
