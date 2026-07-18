@@ -3,6 +3,7 @@ package cn.kuship.console.modules.app.repository;
 import cn.kuship.console.modules.app.entity.ServiceGroup;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface ServiceGroupRepository extends JpaRepository<ServiceGroup, Integer> {
@@ -12,4 +13,7 @@ public interface ServiceGroupRepository extends JpaRepository<ServiceGroup, Inte
 
     /** 团队的全部应用（不分集群，对齐 get_perms_structure/get_role_perms 的 ServiceGroup.filter(tenant_id)）。 */
     List<ServiceGroup> findByTenantId(String tenantId);
+
+    /** 多团队多集群下的应用（对齐企业概览 get_apps_in_multi_team(team_ids, region_names)）。 */
+    List<ServiceGroup> findByTenantIdInAndRegionNameIn(Collection<String> tenantIds, Collection<String> regionNames);
 }

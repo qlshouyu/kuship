@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"docker exec kuship-rainbond sh -c 'kubectl get pods -A 2>/dev/null | grep -i console' 2>/dev/null; docker exec kuship-rainbond sh -c 'crictl ps 2>/dev/null | grep -i console' 2>/dev/null\",...",
+  "error": "Exit code 1",
+  "timestamp": "2026-07-18T09:02:11.621Z",
+  "retry_count": 3
+}
