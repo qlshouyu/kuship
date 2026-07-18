@@ -25,9 +25,14 @@ public final class GeneralMessage {
         return ApiResult.of(code, msg, msgShow, null, list).putExtra("total", total);
     }
 
-    /** general_message(code, msg, msg_show) —— 仅消息，无数据 */
+    /** general_message(code, msg, msg_show) —— 仅消息，data={bean:{},list:[]} */
     public static ApiResult message(int code, String msg, String msgShow) {
         return ApiResult.of(code, msg, msgShow, null, null);
+    }
+
+    /** 裸信封：仅 code/msg/msg_show，无 data。对齐 rainbond 早期校验错误（如 region_name 缺失 → 请求参数不全）。 */
+    public static ApiResult bare(int code, String msg, String msgShow) {
+        return new ApiResult(code, msg, msgShow, null);
     }
 
     /** error_message() —— 统一系统异常 */

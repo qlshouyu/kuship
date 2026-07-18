@@ -41,7 +41,7 @@ public class EnterpriseUserReadService {
             m.put("real_name", u.getRealName() == null ? u.getNickName() : u.getRealName());
             m.put("user_id", u.getUserId());
             m.put("phone", u.getPhone());
-            m.put("create_time", u.getCreateTime()); // ISO（Jackson 默认），对齐 DRF
+            m.put("create_time", cn.kuship.console.common.util.PyIsoDateTime.iso(u.getCreateTime())); // ISO 微秒不截尾零，对齐 DRF
             m.put("default_favorite_name", null);
             m.put("default_favorite_url", null);
             list.add(m);

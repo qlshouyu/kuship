@@ -2,6 +2,7 @@ package cn.kuship.console.modules.app.controller;
 
 import cn.kuship.console.common.response.ApiResult;
 import cn.kuship.console.common.response.GeneralMessage;
+import cn.kuship.console.common.util.RegionScope;
 import cn.kuship.console.modules.app.service.AppReadService;
 import cn.kuship.console.modules.team.entity.Tenants;
 import cn.kuship.console.modules.team.service.TeamContextResolver;
@@ -28,6 +29,7 @@ public class AppController {
     @GetMapping("/console/teams/{team_name}/groups")
     public ApiResult listApps(@PathVariable("team_name") String teamName,
                               @RequestParam(value = "region_name", required = false) String regionName) {
+        RegionScope.require(regionName);
         Tenants team = teamContextResolver.requireTeam(teamName);
         return GeneralMessage.list(200, "success", "查询成功", appReadService.listApps(team.getTenantId(), regionName));
     }

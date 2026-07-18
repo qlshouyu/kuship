@@ -1,5 +1,6 @@
 package cn.kuship.console.common.response;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
@@ -23,6 +24,8 @@ public class ApiResult {
     @JsonProperty("msg_show")
     private String msgShow;
 
+    /** data 为 null 时整体省略（对齐 rainbond 裸校验错误如「请求参数不全」，仅 code/msg/msg_show）。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Map<String, Object> data;
 
     public ApiResult() {

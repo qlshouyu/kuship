@@ -7,6 +7,7 @@ import cn.kuship.console.modules.account.service.AuthService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -46,11 +47,11 @@ public class UserLoginController {
         return GeneralMessage.bean(200, "login success", "登录成功", bean);
     }
 
-    /** POST /console/users/logout → 将当前 token 加入黑名单 */
-    @PostMapping("/console/users/logout")
+    /** GET /console/users/logout → 将当前 token 加入黑名单（对齐 rainbond：UI 用 GET，7070 仅接受 GET，POST 返 405） */
+    @GetMapping("/console/users/logout")
     public ApiResult logout(HttpServletRequest request) {
         authService.logout(resolveToken(request));
-        return GeneralMessage.message(200, "logout success", "已退出登录");
+        return GeneralMessage.message(200, "logout success", "登出成功");
     }
 
     private String resolveToken(HttpServletRequest request) {

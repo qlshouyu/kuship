@@ -97,7 +97,7 @@ public class EnterpriseRegionReadService {
         m.put("rbd_version", "unknown");
         m.put("health_status", "ok");
         m.put("resource_proxy_status", false);
-        m.put("create_time", r.getCreateTime()); // ISO（Jackson 默认），对齐 DRF
+        m.put("create_time", cn.kuship.console.common.util.PyIsoDateTime.iso(r.getCreateTime())); // ISO 微秒不截尾零，对齐 DRF
         m.put("enterprise_alias", enterpriseAlias);
         return m;
     }
@@ -130,7 +130,9 @@ public class EnterpriseRegionReadService {
             Map<String, Object> servicesStatus = new LinkedHashMap<>();
             servicesStatus.put("running", bean.get("run_pod_number"));
             dict.put("services_status", servicesStatus);
-            dict.put("pods", bean.get("pods"));
+            // pods 空态对齐 7070：缺省为 {} 而非 null
+            Object pods = bean.get("pods");
+            dict.put("pods", pods == null ? new LinkedHashMap<>() : pods);
             dict.put("run_pod_number", bean.get("run_pod_number"));
             dict.put("node_ready", bean.get("node_ready"));
             // 节点架构
@@ -178,7 +180,7 @@ public class EnterpriseRegionReadService {
         m.put("rbd_version", "unknown");
         m.put("health_status", "ok");
         m.put("resource_proxy_status", false);
-        m.put("create_time", r.getCreateTime()); // ISO（Jackson 默认），对齐 DRF
+        m.put("create_time", cn.kuship.console.common.util.PyIsoDateTime.iso(r.getCreateTime())); // ISO 微秒不截尾零，对齐 DRF
         m.put("enterprise_alias", enterpriseAlias);
         return m;
     }
