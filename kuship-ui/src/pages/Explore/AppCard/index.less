@@ -1,0 +1,108 @@
+@import '~antd/lib/style/themes/default.less';
+
+.appCard {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 0;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: @rbd-card-shadow;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: @rbd-card-shadow-hover;
+  }
+}
+
+.appCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.appCardIcon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  border-radius: 10px;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  svg {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.appCardInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.appCardTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+
+.appCardName {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: @heading-color;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scopeTag {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 20px;
+  border: 1px solid transparent;
+}
+
+.enterpriseScope {
+  color: #1890ff;
+  background: #e6f7ff;
+  border-color: #91d5ff;
+}
+
+.teamScope {
+  color: #d46b08;
+  background: #fff7e6;
+  border-color: #ffd591;
+}
+
+.appCardVersion {
+  font-size: 12px;
+  color: #999;
+}
+
+.appCardDesc {
+  font-size: 12px;
+  color: @text-color-secondary;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 36px;
+}

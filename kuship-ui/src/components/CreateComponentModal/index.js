@@ -1,0 +1,3345 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Modal, Icon, Spin, Form, Button, Empty, Radio, Input, message } from 'antd';
+import { routerRedux } from 'dva/router';
+import { connect } from 'dva';
+import { pinyin } from 'pinyin-pro';
+import { formatMessage } from '@/utils/intl';
+import {
+  createTeamLlmDownload,
+  getTeamLlmCatalog,
+  getTeamLlmModels,
+  uploadTeamLlmArtifact,
+} from '../../services/aiEngine';
+import globalUtil from '../../utils/global';
+import roleUtil from '../../utils/newRole';
+import PluginUtils from '../../utils/pulginUtils';
+import { importAppPagePlugin } from '../../utils/importPlugins';
+import RbdPluginsCom from '../RBDPluginsCom';
+import AppMarketContent from '../AppMarketContent';
+import ImageNameForm from '../ImageNameForm';
+import ImageComposeForm from '../ImageComposeForm';
+import ImageVirtualMachineForm from '../ImageVirtualMachineForm';
+import AddOrEditImageRegistry from '../AddOrEditImageRegistry';
+import OauthForm from '../OauthForm';
+import CodeCustomForm from '../CodeCustomForm';
+import CodeJwarForm from '../CodeJwarForm';
+import CodeYamlForm from '../CodeYamlForm';
+import HelmCmdForm from '../HelmCmdForm';
+import OuterCustomForm from '../OuterCustomForm';
+import DatabaseCreateForm from '../DatabaseCreateForm';
+import ImgRepostory from '../ImgRepostory';
+import ThirdList from '../ThirdList';
+import oauthUtil from '../../utils/oauth';
+import handleAPIError from '../../utils/error';
+import styles from './index.less';
+import mysql from '../../../public/images/mysql.svg';
+import postgresql from '../../../public/images/postgresql.svg';
+import rabbitmq from '../../../public/images/rabbitmq.svg';
+import redis from '../../../public/images/redis.svg';
+import {
+  CodeIcon,
+  DatabaseIcon,
+  InstalledDatabaseIcon,
+  StoreIcon,
+  FolderOpenIcon,
+  UploadIcon,
+  ContainerIcon,
+  PackageIcon,
+  FileTextIcon,
+  ShipIcon,
+  PuzzleIcon,
+  BoxesIcon,
+  InstalledVmIcon,
+  InstalledLlmIconOrange,
+  GitBranchIcon,
+  GithubIcon,
+  GitlabIcon,
+  GiteeIcon,
+  GiteaIcon
+} from './icons';
+const {
+  buildLlmAssetDownloadPayload,
+  buildLlmCatalogDownloadPayload,
+  buildLlmPluginNavigation,
+  buildLlmRepositoryEntries,
+  extractLlmCatalogModels,
+  getLlmPluginFromList,
+  getLlmModelParameterScale,
+  normalizeLlmModelStatus,
+  resolveCurrentTeamNamespace,
+} = require('./llmEntryHelpers');
+
+const DATABASE_ICON_MAP = {
+  mysql: mysql,
+  postgresql: postgresql,
+  rabbitmq: rabbitmq,
+  redis: redis
+};
+
+const LLM_STATUS_META = {
+  ready: {
+    label: '已下载',
+    badgeClassName: 'llmStatusBadgeDownloaded',
+  },
+  not_downloaded: {
+    label: '未下载',
+    badgeClassName: 'llmStatusBadgeNotDownloaded',
+  },
+  downloading: {
+    label: '下载中',
+    badgeClassName: 'llmStatusBadgeDownloading',
+  },
+  failed: {
+    label: '下载失败',
+    badgeClassName: 'llmStatusBadgeFailed',
+  },
+  deleting: {
+    label: '删除中',
+    badgeClassName: 'llmStatusBadgeDeleting',
+  },
+  unknown: {
+    label: '未下载',
+    badgeClassName: 'llmStatusBadgeNotDownloaded',
+  },
+};
+
+function getLlmStatusMeta(status) {
+  return LLM_STATUS_META[normalizeLlmModelStatus(status)] || LLM_STATUS_META.unknown;
+}
+
+// Form wrapper for market install
+const MarketInstallFormWrapper = Form.create()(
+  ({ form, children, contentRef }) => {
+    return React.cloneElement(children, { form, ref: contentRef });
+  }
+);
+
+// Form wrapper for local market install
+const LocalInstallFormWrapper = Form.create()(
+  ({ form, children, contentRef }) => {
+    return React.cloneElement(children, { form, ref: contentRef });
+  }
+);
+
+const CreateComponentModal = ({ visible, onCancel, dispatch, currentEnterprise, rainbondInfo, currentUser, groups, pluginsList, currentView: initialView }) => {
+  const [currentView, setCurrentView] = useState('main'); // 'main', 'market', 'image', 'code', 'yaml', 'form', 'imageRepo', 'marketStore', 'localMarket', 'marketInstall', 'localMarketInstall'
+  const [hasInitialized, setHasInitialized] = useState(false); // 标记是否已经初始化过
+  const [selectedStore, setSelectedStore] = useState(null);
+  const [marketStores, setMarketStores] = useState([]);
+  const [loadingStores, setLoadingStores] = useState(false);
+  const [imageHubList, setImageHubList] = useState([]);
+  const [loadingImageHubs, setLoadingImageHubs] = useState(false);
+  const [currentFormType, setCurrentFormType] = useState(''); // 'docker', 'docker-compose' 等
+  const [localImageList, setLocalImageList] = useState([]);
+  const [archInfo, setArchInfo] = useState([]);
+  const [showAddImageRegistry, setShowAddImageRegistry] = useState(false);
+  const [clusters, setClusters] = useState([]);
+  const [imageHubLoading, setImageHubLoading] = useState(false);
+  const [showAddOauth, setShowAddOauth] = useState(false);
+  const [oauthTable, setOauthTable] = useState([]);
+  const [helmChildRef, setHelmChildRef] = useState(null);
+  const [selectedImageHub, setSelectedImageHub] = useState(null);
+  const [enterpriseInfo, setEnterpriseInfo] = useState(null);
+  const [loadingEnterpriseInfo, setLoadingEnterpriseInfo] = useState(false);
+  const [selectedOauthService, setSelectedOauthService] = useState(null);
+
+  // 数据库相关状态
+  const [databaseTypes, setDatabaseTypes] = useState([]);
+  const [loadingDatabaseInfo, setLoadingDatabaseInfo] = useState(false);
+  const [currentDatabaseType, setCurrentDatabaseType] = useState(null);
+  const [showDatabaseForm, setShowDatabaseForm] = useState(false);
+  const [virtualMachineImages, setVirtualMachineImages] = useState([]);
+
+  // 插件相关状态
+  const [availablePlugins, setAvailablePlugins] = useState([]);
+  const [selectedPlugin, setSelectedPlugin] = useState(null);
+  const [pluginModalVisible, setPluginModalVisible] = useState(false);
+  const [pluginApp, setPluginApp] = useState({});
+  const [pluginLoading, setPluginLoading] = useState(true);
+  const [pluginError, setPluginError] = useState(false);
+  const [pluginErrInfo, setPluginErrInfo] = useState('');
+  const [importingPlugin, setImportingPlugin] = useState(null);
+  const [showLlmSelectModal, setShowLlmSelectModal] = useState(false);
+  const [llmModelsLoading, setLlmModelsLoading] = useState(false);
+  const [llmModels, setLlmModels] = useState([]);
+  const [llmModelsError, setLlmModelsError] = useState('');
+  const [llmRepositorySearch, setLlmRepositorySearch] = useState('');
+  const [selectedLlmRepositoryKey, setSelectedLlmRepositoryKey] = useState('');
+  const [llmSourceType, setLlmSourceType] = useState('repository');
+  const [llmSubmitLoading, setLlmSubmitLoading] = useState(false);
+  const [llmUploadFile, setLlmUploadFile] = useState(null);
+  const [llmForm, setLlmForm] = useState({
+    display_name: '',
+    source_uri: '',
+    parameters: '',
+  });
+
+  // 应用市场相关状态
+  const [marketApps, setMarketApps] = useState([]);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [marketSearchValue, setMarketSearchValue] = useState('');
+  const [marketPage, setMarketPage] = useState(1);
+  const [marketTotal, setMarketTotal] = useState(0);
+  const [marketHasMore, setMarketHasMore] = useState(true);
+  const [marketLoadingMore, setMarketLoadingMore] = useState(false);
+  const [selectedMarketApp, setSelectedMarketApp] = useState(null);
+  const [marketInstallType, setMarketInstallType] = useState('new');
+  const [selectedMarketVersion, setSelectedMarketVersion] = useState('');
+  const [currentMarketVersionInfo, setCurrentMarketVersionInfo] = useState({});
+  const [marketSubmitLoading, setMarketSubmitLoading] = useState(false);
+
+  // 本地组件库相关状态
+  const [localMarketApps, setLocalMarketApps] = useState([]);
+  const [localMarketLoading, setLocalMarketLoading] = useState(false);
+  const [localMarketSearchValue, setLocalMarketSearchValue] = useState('');
+  const [localMarketPage, setLocalMarketPage] = useState(1);
+  const [localMarketTotal, setLocalMarketTotal] = useState(0);
+  const [localMarketHasMore, setLocalMarketHasMore] = useState(true);
+  const [localMarketLoadingMore, setLocalMarketLoadingMore] = useState(false);
+  const [localMarketActiveTab, setLocalMarketActiveTab] = useState('all');
+  const [selectedLocalApp, setSelectedLocalApp] = useState(null);
+  const [localInstallType, setLocalInstallType] = useState('new');
+  const [selectedLocalVersion, setSelectedLocalVersion] = useState('');
+  const [currentLocalVersionInfo, setCurrentLocalVersionInfo] = useState({});
+  const [localSubmitLoading, setLocalSubmitLoading] = useState(false);
+
+  const canAccessResourceCenter = !(rainbondInfo && rainbondInfo.is_saas) || !!(currentUser && currentUser.is_enterprise_admin);
+
+  const marketListRef = useRef(null);
+  const localMarketListRef = useRef(null);
+  const viewHistoryRef = useRef([]);
+
+  // 各个表单的 ref
+  const dockerFormRef = useRef(null);
+  const dockerComposeFormRef = useRef(null);
+  const codeCustomFormRef = useRef(null);
+  const codeJwarFormRef = useRef(null);
+  const yamlFormRef = useRef(null);
+  const helmFormRef = useRef(null);
+  const thirdPartyFormRef = useRef(null);
+  const thirdListFormRef = useRef(null);
+  const databaseFormRef = useRef(null);
+  const vmFormRef = useRef(null);
+  const marketInstallFormRef = useRef(null);
+  const localInstallFormRef = useRef(null);
+  const imageRepoFormRef = useRef(null);
+
+  const pushViewHistory = (nextView) => {
+    if (currentView !== nextView) {
+      viewHistoryRef.current.push(currentView);
+    }
+    setCurrentView(nextView);
+  };
+
+  const resetViewHistory = () => {
+    viewHistoryRef.current = [];
+  };
+
+  const popViewHistory = (fallbackView = 'main') => {
+    const previousView = viewHistoryRef.current.pop();
+    setCurrentView(previousView || fallbackView);
+  };
+
+  // 获取商店应用列表
+  const fetchMarketApps = (storeName, page = 1, searchKey = '') => {
+    setMarketLoading(page === 1);
+    dispatch({
+      type: 'market/fetchMarkets',
+      payload: {
+        enterprise_id: currentEnterprise.enterprise_id,
+        name: storeName,
+        query: searchKey,
+        page,
+        pageSize: 10
+      },
+      callback: res => {
+        if (res && res.status_code === 200) {
+          const list = res.list || [];
+          setMarketApps(prevApps => {
+            return page === 1 ? list : [...prevApps, ...list];
+          });
+          setMarketTotal(res.total || 0);
+          setMarketHasMore(list.length >= 10);
+        } else {
+          if (page === 1) {
+            setMarketApps([]);
+          }
+        }
+        setMarketLoading(false);
+        setMarketLoadingMore(false);
+      },
+      handleError: err => {
+        if (page === 1) {
+          setMarketApps([]);
+        }
+        setMarketLoading(false);
+        setMarketLoadingMore(false);
+        handleAPIError(err);
+      }
+    });
+  };
+
+  // 获取本地组件库应用列表
+  const fetchLocalMarketApps = (page = 1, searchKey = '', tab = 'all') => {
+    setLocalMarketLoading(page === 1); // 只有第一页才显示加载状态
+    const teamName = globalUtil.getCurrTeamName();
+    dispatch({
+      type: 'market/fetchAppModels',
+      payload: {
+        enterprise_id: currentEnterprise.enterprise_id,
+        app_name: searchKey,
+        page,
+        page_size: 10,
+        tenant_name: teamName,
+        scope: tab === 'all' ? '' : tab
+      },
+      callback: res => {
+        if (res && res.status_code === 200) {
+          const list = res.list || [];
+          // 使用函数式更新,确保能获取到最新的 localMarketApps 值
+          setLocalMarketApps(prevApps => {
+            return page === 1 ? list : [...prevApps, ...list];
+          });
+          setLocalMarketTotal(res.total || 0);
+          setLocalMarketHasMore(list.length >= 10);
+        } else {
+          if (page === 1) {
+            setLocalMarketApps([]);
+          }
+        }
+        setLocalMarketLoading(false);
+        setLocalMarketLoadingMore(false);
+      },
+      handleError: err => {
+        if (page === 1) {
+          setLocalMarketApps([]);
+        }
+        setLocalMarketLoading(false);
+        setLocalMarketLoadingMore(false);
+        handleAPIError(err);
+      }
+    });
+  };
+
+  // 获取应用列表
+  const fetchGroupsList = () => {
+    const teamName = globalUtil.getCurrTeamName();
+    dispatch({
+      type: 'global/fetchGroups',
+      payload: {
+        team_name: teamName
+      }
+    });
+  };
+
+  // 处理商店应用安装按钮点击
+  const handleMarketAppInstall = (app) => {
+    setSelectedMarketApp(app);
+    // 初始化版本信息为第一个版本
+    if (app.versions_info && app.versions_info.length > 0) {
+      setCurrentMarketVersionInfo(app.versions_info[0]);
+    } else if (app.versions && app.versions.length > 0) {
+      setCurrentMarketVersionInfo(app.versions[0]);
+    }
+    pushViewHistory('marketInstall');
+    // 获取应用列表供"安装到已有应用"使用
+    fetchGroupsList();
+  };
+
+  // 处理本地应用安装按钮点击
+  const handleLocalAppInstall = (app) => {
+    setSelectedLocalApp(app);
+    // 初始化版本信息为第一个版本
+    if (app.versions_info && app.versions_info.length > 0) {
+      setCurrentLocalVersionInfo(app.versions_info[0]);
+    } else if (app.versions && app.versions.length > 0) {
+      setCurrentLocalVersionInfo(app.versions[0]);
+    }
+    pushViewHistory('localMarketInstall');
+    // 获取应用列表供"安装到已有应用"使用
+    fetchGroupsList();
+  };
+
+  // 处理商店应用版本变更
+  const handleMarketVersionChange = (version) => {
+    setSelectedMarketVersion(version);
+    const app = selectedMarketApp;
+    if (app && app.versions_info) {
+      const versionInfo = app.versions_info.find(v => v.version === version);
+      if (versionInfo) {
+        setCurrentMarketVersionInfo(versionInfo);
+      }
+    }
+  };
+
+  // 处理本地应用版本变更
+  const handleLocalVersionChange = (version) => {
+    setSelectedLocalVersion(version);
+    const app = selectedLocalApp;
+    if (app && app.versions) {
+      const versionInfo = app.versions.find(v => v.app_version === version);
+      if (versionInfo) {
+        setCurrentLocalVersionInfo(versionInfo);
+      }
+    }
+  };
+
+  // 处理商店应用搜索
+  const handleMarketSearch = (value) => {
+    setMarketSearchValue(value);
+    setMarketPage(1);
+    fetchMarketApps(selectedStore?.name, 1, value);
+  };
+
+  // 处理本地应用搜索
+  const handleLocalMarketSearch = (value) => {
+    setLocalMarketSearchValue(value);
+    setLocalMarketPage(1);
+    fetchLocalMarketApps(1, value, localMarketActiveTab);
+  };
+
+  // 处理本地组件库标签切换
+  const handleLocalMarketTabChange = (tab) => {
+    setLocalMarketActiveTab(tab);
+    setLocalMarketPage(1);
+    setLocalMarketApps([]);
+    fetchLocalMarketApps(1, localMarketSearchValue, tab);
+  };
+
+  // 生成英文名
+  const generateEnglishName = (name) => {
+    if (name) {
+      const pinyinName = pinyin(name, { toneType: 'none' }).replace(/\s/g, '');
+      const cleanedPinyinName = pinyinName.toLowerCase();
+      return cleanedPinyinName;
+    }
+    return '';
+  };
+
+  // 处理商店应用安装提交
+  const handleMarketAppSubmit = (vals) => {
+    setMarketSubmitLoading(true);
+    const teamName = globalUtil.getCurrTeamName();
+    const regionName = globalUtil.getCurrRegionName();
+    const group_id = globalUtil.getAppID();
+    const timestamp = new Date().getTime();
+
+
+    const installApp = (finalGroupId, isNewApp = false) => {
+      dispatch({
+        type: 'createApp/installApp',
+        payload: {
+          team_name: teamName,
+          ...vals,
+          group_id: finalGroupId,
+          app_id: selectedMarketApp.app_id,
+          is_deploy: true,
+          group_key: selectedMarketApp.group_key || selectedMarketApp.ID,
+          app_version: vals.group_version,
+          marketName: selectedStore.name,
+          install_from_cloud: true
+        },
+        callback: () => {
+          dispatch({
+            type: 'global/fetchGroups',
+            payload: {
+              team_name: teamName
+            },
+            callback: () => {
+              if (isNewApp) {
+                // 新应用安装完成后跳转到应用详情页
+                dispatch(
+                  routerRedux.push(
+                    `/team/${teamName}/region/${regionName}/apps/${finalGroupId}/overview`
+                  )
+                );
+              } else {
+                dispatch(
+                  routerRedux.push(
+                    `/team/${teamName}/region/${regionName}/apps/${finalGroupId}/overview?refresh=${timestamp}`
+                  )
+                );
+              }
+            }
+          });
+          setMarketSubmitLoading(false);
+          onCancel();
+        },
+        handleError: (err) => {
+          setMarketSubmitLoading(false);
+          handleAPIError(err);
+        }
+      });
+    };
+
+    if (group_id) {
+      // 已有 group_id,直接安装
+      installApp(group_id);
+    } else if (vals.install_type === 'new' && vals.group_name) {
+      // 创建新应用,先创建应用获取 group_id,再安装
+      const k8s_app = generateEnglishName(vals.group_name);
+      dispatch({
+        type: 'application/addGroup',
+        payload: {
+          region_name: regionName,
+          team_name: teamName,
+          group_name: vals.group_name,
+          k8s_app: k8s_app,
+          note: '',
+        },
+        callback: (res) => {
+          roleUtil.refreshPermissionsInfo();
+          if (res && res.group_id) {
+            installApp(res.group_id, true);
+          } else {
+            setMarketSubmitLoading(false);
+          }
+        },
+        handleError: (err) => {
+          setMarketSubmitLoading(false);
+          handleAPIError(err);
+        }
+      });
+    } else if (vals.install_type === 'existing' && vals.group_id) {
+      // 安装到已有应用
+      installApp(vals.group_id, true);
+    } else {
+      setMarketSubmitLoading(false);
+    }
+  };
+
+  // 处理本地应用安装提交
+  const handleLocalAppSubmit = (vals) => {
+    setLocalSubmitLoading(true);
+    const teamName = globalUtil.getCurrTeamName();
+    const regionName = globalUtil.getCurrRegionName();
+    const group_id = globalUtil.getAppID();
+    const timestamp = new Date().getTime();
+
+    const installApp = (finalGroupId, isNewApp = false) => {
+      dispatch({
+        type: 'createApp/installApp',
+        payload: {
+          team_name: teamName,
+          ...vals,
+          group_id: finalGroupId,
+          app_id: selectedLocalApp.app_id,
+          is_deploy: true,
+          group_key: selectedLocalApp.group_key || selectedLocalApp.ID,
+          app_version: vals.group_version,
+          install_from_cloud: false
+        },
+        callback: () => {
+          dispatch({
+            type: 'global/fetchGroups',
+            payload: {
+              team_name: teamName
+            },
+            callback: () => {
+              if (isNewApp) {
+                // 新应用安装完成后跳转到应用详情页
+                dispatch(
+                  routerRedux.push(
+                    `/team/${teamName}/region/${regionName}/apps/${finalGroupId}/overview`
+                  )
+                );
+              } else {
+                dispatch(
+                  routerRedux.push(
+                    `/team/${teamName}/region/${regionName}/apps/${finalGroupId}/overview?refresh=${timestamp}`
+                  )
+                );
+              }
+            }
+          });
+          setLocalSubmitLoading(false);
+          onCancel();
+        },
+        handleError: (err) => {
+          setLocalSubmitLoading(false);
+          handleAPIError(err);
+        }
+      });
+    };
+
+    if (group_id) {
+      // 已有 group_id,直接安装
+      installApp(group_id);
+    } else if (vals.install_type === 'new' && vals.group_name) {
+      // 创建新应用,先创建应用获取 group_id,再安装
+      const k8s_app = generateEnglishName(vals.group_name);
+      dispatch({
+        type: 'application/addGroup',
+        payload: {
+          region_name: regionName,
+          team_name: teamName,
+          group_name: vals.group_name,
+          k8s_app: k8s_app,
+          note: '',
+        },
+        callback: (res) => {
+          roleUtil.refreshPermissionsInfo();
+          if (res && res.group_id) {
+            installApp(res.group_id, true);
+          } else {
+            setLocalSubmitLoading(false);
+          }
+        },
+        handleError: (err) => {
+          setLocalSubmitLoading(false);
+          handleAPIError(err);
+        }
+      });
+    } else if (vals.install_type === 'existing' && vals.group_id) {
+      // 安装到已有应用
+      installApp(vals.group_id, true);
+    } else {
+      setLocalSubmitLoading(false);
+    }
+  };
+
+  const isComponentView = !!globalUtil.getAppID();
+
+  const menuItems = [
+    {
+      icon: 'shop',
+      iconSrc: StoreIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.from_market' }),
+      key: 'market',
+      hasSubMenu: true,
+      iconColor: '#1890ff',
+    },
+    {
+      icon: 'block',
+      iconSrc: ContainerIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.from_image' }),
+      key: 'image',
+      testid: 'rbd-create-from-image',
+      hasSubMenu: true,
+      iconColor: '#fa8c16',
+    },
+    {
+      icon: 'code',
+      iconSrc: CodeIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.from_source' }),
+      key: 'code',
+      hasSubMenu: true,
+      iconColor: '#52c41a',
+    },
+    {
+      icon: 'code',
+      iconSrc: PackageIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.package' }),
+      key: 'package',
+      showForm: true,
+      formType: 'code-jwar',
+      iconColor: '#eb2f96',
+    },
+    ...(!isComponentView ? [{
+      icon: 'file-text',
+      iconSrc: FileTextIcon,
+      title: 'Yaml Helm K8s',
+      key: 'yaml',
+      hasSubMenu: true,
+      iconColor: '#722ed1',
+    }] : []),
+    // 每个插件独立展示在第一层菜单
+    ...availablePlugins.map(plugin => ({
+      icon: 'api',
+      title: plugin.display_name || plugin.alias || plugin.name || formatMessage({ id: 'componentOverview.body.CreateComponentModal.plugin' }),
+      key: `plugin-${plugin.name}`,
+      plugin: plugin,
+      showPluginModal: true
+    }))
+  ];
+  if (showDatabaseForm) {
+    menuItems.push({
+      icon: 'database',
+      iconSrc: InstalledDatabaseIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.database' }),
+      key: 'database',
+      hasSubMenu: true,
+      iconColor: '#13c2c2',
+    });
+  }
+
+  const showDatabaseEntry = false;
+  const showVmEntry = true;
+  const showExtensionSection = true;
+
+  // 动态生成市场子项:应用商店分隔符 + 商店列表 + 本地资源分隔符 + 本地组件库 + 离线导入
+  const marketSubItems = [
+    // 应用商店分隔符和商店列表
+    ...(marketStores.length > 0 ? [
+      ...marketStores.map(store => ({
+        icon: 'shop',
+        iconSrc: StoreIcon,
+        title: store.alias || store.name,
+        key: `store-${store.name}`,
+        storeName: store.name,
+        showMarketModal: true,  // 标记需要打开应用列表弹窗
+        iconColor: '#1890ff',
+      }))
+    ] : []),
+    {
+      icon: 'appstore',
+      iconSrc: FolderOpenIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.local_market' }),
+      key: 'local-market',
+      showLocalMarketModal: true,  // 标记需要打开本地组件库弹窗
+      iconColor: '#1890ff',
+    },
+    ...(!isComponentView ? [{
+      icon: 'shop',
+      iconSrc: UploadIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.offline_import' }),
+      key: 'offline-import',
+      path: 'shared/import',
+      iconColor: '#1890ff',
+    }] : [])
+  ];
+
+  // 动态生成镜像子项:容器 + 分隔符 + 镜像仓库列表
+  const imageSubItems = [
+    {
+      icon: 'block',
+      iconSrc: ContainerIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.container' }),
+      key: 'custom',
+      testid: 'rbd-create-image-source-container',
+      showForm: true,
+      formType: 'docker',
+      iconColor: '#fa8c16',
+    },
+    {
+      key: 'image-hub-divider',
+      isDivider: true,
+      dividerText: formatMessage({ id: 'componentOverview.body.CreateComponentModal.or_select_connected_repo' })
+    },
+    // 仓库列表分隔符和列表项
+    ...(imageHubList.length > 0 ? [
+      ...imageHubList.map(hub => ({
+        icon: 'block',
+        iconSrc: BoxesIcon,
+        title: `${hub.hub_type} (${hub.secret_id})`,
+        key: `image-hub-${hub.secret_id}`,
+        showImgRepostory: true,
+        secretId: hub.secret_id,
+        iconColor: '#fa8c16',
+      }))
+    ] : [])
+  ];
+
+  // 使用 oauthUtil 过滤出可用的 Git 仓库
+  const codeRepositoryList = enterpriseInfo ? oauthUtil.getEnableGitOauthServer(enterpriseInfo) : [];
+
+  // 根据仓库类型返回对应的图标组件
+  const getRepoIcon = (oauthType) => {
+    const typeMap = {
+      'github': GithubIcon,
+      'gitlab': GitlabIcon,
+      'gitee': GiteeIcon,
+      'gitea': GiteaIcon
+    };
+    return typeMap[oauthType?.toLowerCase()] || GitBranchIcon;
+  };
+
+  // 根据仓库类型返回对应的品牌色
+  const getRepoColor = (oauthType) => {
+    const colorMap = {
+      'github': '#24292e',   // GitHub 黑色
+      'gitlab': '#FC6D26',   // GitLab 橙色
+      'gitee': '#C71D23',    // Gitee 红色
+      'gitea': '#609926'     // Gitea 绿色
+    };
+    return colorMap[oauthType?.toLowerCase()] || '#52c41a'; // 默认绿色
+  };
+
+  const codeSubItems = [
+    {
+      icon: 'code',
+      iconSrc: CodeIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.source_code' }),
+      key: 'source-code',
+      showForm: true,
+      formType: 'code-custom',
+      iconColor: '#52c41a',
+    },
+    // 仓库列表分隔符和列表项
+    ...(codeRepositoryList.length > 0 ? [
+      {
+        key: 'code-repo-divider',
+        isDivider: true,
+        dividerText: formatMessage({ id: 'componentOverview.body.CreateComponentModal.or_select_connected_repo' })
+      },
+      ...codeRepositoryList.map(repo => ({
+        icon: 'code',
+        iconSrc: getRepoIcon(repo.oauth_type),
+        title: `${repo.name}`,
+        key: `code-repo-${repo.service_id}`,
+        showThirdList: true,
+        oauthService: repo,
+        iconColor: getRepoColor(repo.oauth_type),
+      }))
+    ] : [])
+  ];
+
+  const yamlSubItems = [
+    {
+      icon: 'file-text',
+      iconSrc: FileTextIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.rainbond_app_model' }),
+      key: 'yaml-rainbond-model',
+      showForm: true,
+      formType: 'yaml',
+      iconColor: '#722ed1',
+    },
+    {
+      icon: 'appstore',
+      iconSrc: BoxesIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.k8s_native_resource' }),
+      key: 'yaml-k8s-resource',
+      navigateToResourceCenterWorkloadCreate: true,
+      iconColor: '#722ed1',
+    }
+  ];
+
+  // 数据库类型名称格式化方法
+  const formatDatabaseTypeName = (type) => {
+    const typeMap = {
+      'mysql': 'MySQL',
+      'postgresql': 'PostgreSQL',
+      'rabbitmq': 'RabbitMQ',
+      'redis': 'Redis'
+    };
+    return typeMap[type?.toLowerCase()] || type || formatMessage({ id: 'componentOverview.body.CreateComponentModal.database' });
+  };
+
+  // 直接基于返回的数据库类型获取数据库图标路径
+  const getDatabaseIconSrc = (databaseType) => {
+    if (!databaseType) return null;
+    const type = databaseType.toLowerCase();
+    return DATABASE_ICON_MAP[type] || null;
+  };
+
+  // 动态生成数据库子项：根据获取到的数据库类型
+  const databaseSubItems = databaseTypes.map(dbType => {
+    const iconSrc = getDatabaseIconSrc(dbType.type);
+    return {
+      icon: 'database',
+      iconSrc: iconSrc,
+      title: formatDatabaseTypeName(dbType.type) || formatDatabaseTypeName(dbType.label) || '数据库',
+      key: `database-${dbType.type}`,
+      showForm: true,
+      formType: 'database',  // 统一使用 'database' 作为表单类型
+      databaseType: dbType.type
+    };
+  });
+
+  const marketSectionItems = [
+    ...marketStores.map(store => ({
+      icon: 'shop',
+      iconSrc: StoreIcon,
+      title: store.alias || store.name,
+      key: `store-${store.name}`,
+      storeName: store.name,
+      showMarketModal: true,
+      iconColor: '#1890ff',
+    })),
+    {
+      icon: 'appstore',
+      iconSrc: FolderOpenIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.local_market' }),
+      key: 'local-market',
+      showLocalMarketModal: true,
+      iconColor: '#1890ff',
+    }
+  ];
+
+  const customBuildSectionItems = [
+    {
+      icon: 'block',
+      iconSrc: ContainerIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.image_entry' }),
+      key: 'image',
+      hasSubMenu: true,
+      iconColor: '#fa8c16',
+    },
+    {
+      icon: 'code',
+      iconSrc: CodeIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.source_entry' }),
+      key: 'code',
+      hasSubMenu: true,
+      iconColor: '#52c41a',
+    },
+    {
+      icon: 'code',
+      iconSrc: PackageIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.package' }),
+      key: 'package',
+      showForm: true,
+      formType: 'code-jwar',
+      iconColor: '#eb2f96',
+    },
+    ...(!isComponentView ? [{
+      icon: 'shop',
+      iconSrc: UploadIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.offline_import' }),
+      key: 'offline-import',
+      path: 'shared/import',
+      iconColor: '#1890ff',
+    }] : [])
+  ];
+
+  const advancedSectionItems = [
+    ...(!isComponentView && canAccessResourceCenter ? [{
+      icon: 'file-text',
+      iconSrc: FileTextIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.yaml_entry' }),
+      key: 'yaml',
+      hasSubMenu: true,
+      iconColor: '#722ed1',
+    },
+    {
+      icon: 'file-text',
+      iconSrc: ShipIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.helm_entry' }),
+      key: 'helm',
+      navigateToResourceCenterHelm: true,
+      iconColor: '#722ed1',
+    }] : []),
+    ...(!isComponentView ? [{
+      icon: 'block',
+      iconSrc: ContainerIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.docker_compose' }),
+      key: 'docker-compose',
+      showForm: true,
+      formType: 'docker-compose',
+      iconColor: '#fa8c16',
+    }] : []),
+    {
+      icon: 'file-text',
+      iconSrc: PuzzleIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.third_party' }),
+      key: 'third-party',
+      showForm: true,
+      formType: 'third-party',
+      iconColor: '#722ed1',
+    }
+  ];
+
+  const extensionSectionItems = [
+    ...(showDatabaseEntry ? [{
+      icon: 'database',
+      iconSrc: InstalledDatabaseIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.database' }),
+      key: 'database',
+      ...(showDatabaseForm ? { hasSubMenu: true } : {}),
+      iconColor: '#13c2c2',
+    }] : []),
+    ...(showVmEntry ? [{
+      iconSrc: InstalledVmIcon,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.vm' }),
+      key: 'vm',
+      showForm: true,
+      formType: 'vm',
+      iconColor: '#fa8c16',
+    }] : []),
+    {
+      iconSrc: InstalledLlmIconOrange,
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.llm' }),
+      key: 'llm',
+      iconColor: '#722ed1',
+    },
+    ...availablePlugins.map(plugin => ({
+      icon: 'api',
+      title: plugin.display_name || plugin.alias || plugin.name || formatMessage({ id: 'componentOverview.body.CreateComponentModal.plugin' }),
+      key: `plugin-${plugin.name}`,
+      plugin: plugin,
+      showPluginModal: true,
+      iconColor: '#13c2c2',
+    }))
+  ];
+
+  const mainSections = [
+    {
+      key: 'market-group',
+      order: '01',
+      label: formatMessage({ id: 'componentOverview.body.CreateComponentModal.group_market' }),
+      items: marketSectionItems
+    },
+    {
+      key: 'custom-build-group',
+      order: '02',
+      label: formatMessage({ id: 'componentOverview.body.CreateComponentModal.group_custom_build' }),
+      items: customBuildSectionItems
+    },
+    {
+      key: 'advanced-group',
+      order: '03',
+      label: formatMessage({ id: 'componentOverview.body.CreateComponentModal.group_advanced' }),
+      items: advancedSectionItems
+    },
+    ...(showExtensionSection ? [{
+      key: 'extension-group',
+      order: '04',
+      label: formatMessage({ id: 'componentOverview.body.CreateComponentModal.group_extension' }),
+      items: extensionSectionItems
+    }] : [])
+  ];
+
+
+
+  // 插件现在直接在第一层菜单展示，不需要子菜单
+
+  const fetchMarketStores = () => {
+    setLoadingStores(true);
+    dispatch({
+      type: 'market/fetchMarketsTab',
+      payload: {
+        enterprise_id: currentEnterprise.enterprise_id
+      },
+      callback: res => {
+        const list = (res && res.list) || [];
+        const activeStores = list.filter(item => item.status === 1);
+        setMarketStores(activeStores);
+        setLoadingStores(false);
+        getStoreList();
+      },
+      handleError: err => {
+        setMarketStores([]);
+        setLoadingStores(false);
+        handleAPIError(err);
+      }
+    });
+  };
+
+  const getStoreList = () => {
+    dispatch({
+      type: 'enterprise/fetchEnterpriseStoreList',
+      payload: {
+        enterprise_id: currentEnterprise?.enterprise_id
+      },
+      callback: data => {
+      }
+    });
+  };
+
+  const fetchImageHubs = () => {
+    setLoadingImageHubs(true);
+    dispatch({
+      type: 'global/fetchPlatformImageHub',
+      callback: data => {
+        if (data) {
+          setImageHubList(data.list || []);
+        }
+        setLoadingImageHubs(false);
+      },
+      handleError: err => {
+        setImageHubList([]);
+        setLoadingImageHubs(false);
+        handleAPIError(err);
+      }
+    });
+  };
+
+  const fetchClusters = () => {
+    if (currentUser?.enterprise_id) {
+      dispatch({
+        type: 'region/fetchEnterpriseClusters',
+        payload: {
+          enterprise_id: currentUser.enterprise_id
+        },
+        callback: res => {
+          if (res && res.list) {
+            const clusterList = res.list.map((item, index) => ({
+              ...item,
+              key: `cluster${index}`
+            }));
+            setClusters(clusterList);
+          } else {
+            setClusters([]);
+          }
+        },
+        handleError: err => {
+          setClusters([]);
+          handleAPIError(err);
+        }
+      });
+    }
+  };
+
+  const fetchLocalImageList = () => {
+    const isSaas = rainbondInfo?.is_saas || false;
+    if (!isSaas) {
+      const teamName = globalUtil.getCurrTeamName();
+
+      // 如果无法获取 team_name,不执行 API 调用
+      if (!teamName) {
+        return;
+      }
+
+      dispatch({
+        type: 'createApp/getImageRepositories',
+        payload: {
+          team_name: teamName
+        },
+        callback: data => {
+          if (data) {
+            setLocalImageList(data.list || []);
+          }
+        },
+        handleError: err => {
+          setLocalImageList([]);
+          handleAPIError(err);
+        }
+      });
+    }
+  };
+
+  const fetchArchInfo = () => {
+    const regionName = globalUtil.getCurrRegionName();
+    const teamName = globalUtil.getCurrTeamName();
+
+    // 如果无法获取 region 或 team 信息,不执行 API 调用
+    if (!regionName || !teamName) {
+      return;
+    }
+
+    dispatch({
+      type: 'index/fetchArchOverview',
+      payload: {
+        region_name: regionName,
+        team_name: teamName
+      },
+      callback: res => {
+        if (res && res.bean) {
+          setArchInfo(res.list || []);
+        }
+      },
+      handleError: err => {
+        // 设置默认值,避免阻塞用户操作
+        setArchInfo([]);
+        handleAPIError(err);
+      }
+    });
+  };
+  const fetchEnterpriseInfo = () => {
+    const enterprise_id = currentEnterprise && currentEnterprise.enterprise_id;
+
+    if (!enterprise_id) {
+      return;
+    }
+
+    setLoadingEnterpriseInfo(true);
+    dispatch({
+      type: 'global/fetchEnterpriseInfo',
+      payload: {
+        enterprise_id
+      },
+      callback: res => {
+        if (res && res.bean) {
+          setEnterpriseInfo(res.bean);
+        }
+        setLoadingEnterpriseInfo(false);
+      },
+      handleError: err => {
+        setEnterpriseInfo(null);
+        setLoadingEnterpriseInfo(false);
+        handleAPIError(err);
+      }
+    });
+  };
+  // 获取可用的插件列表
+  const fetchAvailablePlugins = () => {
+    const teamName = globalUtil.getCurrTeamName();
+
+    const bool = PluginUtils.isInstallPlugin(pluginsList, "rainbond-databases");
+    setShowDatabaseForm(bool);
+    // 根据团队视图过滤插件
+    const filteredPlugins = PluginUtils.segregatePluginsByHierarchy(pluginsList, 'TeamModal');
+
+    // 过滤出有弹窗字段的插件（这里假设插件有特定的属性标识弹窗功能）
+    const modalPlugins = filteredPlugins.filter(plugin => {
+      // 可以根据插件的特定属性来判断是否有弹窗字段
+      // 例如：plugin.has_modal_fields || plugin.plugin_type === 'modal' 等
+      return plugin.enable_status === 'true' && (
+        plugin.plugin_type === 'JSInject' ||
+        plugin.has_modal_fields ||
+        plugin.show_in_create_modal ||
+        plugin.name?.includes('create') ||
+        plugin.name?.includes('modal')
+      );
+    });
+
+    setAvailablePlugins(modalPlugins);
+  };
+
+  // 获取数据库类型列表
+  const fetchDatabaseTypes = () => {
+    const teamName = globalUtil.getCurrTeamName();
+    const regionName = globalUtil.getCurrRegionName();
+
+    if (!teamName || !regionName) {
+      return;
+    }
+    setLoadingDatabaseInfo(true);
+    dispatch({
+      type: 'kubeblocks/fetchKubeBlocksDatabaseTypes',
+      payload: {
+        team_name: teamName,
+        region_name: regionName
+      },
+      callback: res => {
+        if (res && Array.isArray(res.list)) {
+          setDatabaseTypes(res.list);
+          setLoadingDatabaseInfo(false);
+        }
+      }
+    });
+  };
+
+  const fetchVirtualMachineImages = () => {
+    const teamName = globalUtil.getCurrTeamName();
+
+    if (!teamName) {
+      setVirtualMachineImages([]);
+      return;
+    }
+
+    dispatch({
+      type: 'createApp/getAppByVirtualMachineImage',
+      payload: {
+        team_name: teamName
+      },
+      callback: data => {
+        setVirtualMachineImages((data && data.list) || []);
+      },
+      handleError: err => {
+        setVirtualMachineImages([]);
+        handleAPIError(err);
+      }
+    });
+  };
+
+  const isAiEngineSuccess = (res) => !!(res && (res.code === 200 || res.status_code === 200));
+
+  const resetLlmSelectorState = () => {
+    setShowLlmSelectModal(false);
+    setLlmModelsLoading(false);
+    setLlmModels([]);
+    setLlmModelsError('');
+    setLlmRepositorySearch('');
+    setSelectedLlmRepositoryKey('');
+    setLlmSourceType('repository');
+    setLlmSubmitLoading(false);
+    setLlmUploadFile(null);
+    setLlmForm({
+      display_name: '',
+      source_uri: '',
+      parameters: '',
+    });
+  };
+
+  const handleCloseLlmSelectModal = () => {
+    resetLlmSelectorState();
+  };
+
+  const fetchTeamLlmModelsList = () => {
+    const teamName = globalUtil.getCurrTeamName();
+    const regionName = globalUtil.getCurrRegionName();
+
+    if (!teamName || !regionName) {
+      setLlmModels([]);
+      return;
+    }
+
+    const namespace = resolveCurrentTeamNamespace(currentUser, teamName);
+
+    setLlmModelsLoading(true);
+    setLlmModelsError('');
+    const teamModelsRequest = getTeamLlmModels({
+      team_name: teamName,
+      region_name: regionName,
+      namespace,
+    }).catch((err) => ({ __error: err }));
+    const catalogRequest = getTeamLlmCatalog({
+      team_name: teamName,
+      region_name: regionName,
+      namespace,
+    }).catch((err) => ({ __error: err }));
+
+    Promise.all([teamModelsRequest, catalogRequest]).then(([teamRes, catalogRes]) => {
+      const hasTeamError = !!(teamRes && teamRes.__error);
+      const hasCatalogError = !!(catalogRes && catalogRes.__error);
+      const teamPayload = isAiEngineSuccess(teamRes) ? (teamRes.data || teamRes) : {};
+      const catalogPayload = isAiEngineSuccess(catalogRes) ? (catalogRes.data || catalogRes) : [];
+      const catalogModels = extractLlmCatalogModels(catalogPayload);
+      const teamModels = teamPayload.models || [];
+
+      setLlmModels(buildLlmRepositoryEntries(catalogModels, teamModels));
+
+      if (hasTeamError && hasCatalogError) {
+        setLlmModelsError(
+          formatMessage({ id: 'componentOverview.body.CreateComponentModal.llm_fetch_failed' })
+        );
+        handleAPIError(teamRes.__error);
+        return;
+      }
+
+      if (!isAiEngineSuccess(teamRes) && !hasTeamError) {
+        setLlmModelsError((teamRes && (teamRes.msg || teamRes.msg_show)) || '');
+      } else if (!isAiEngineSuccess(catalogRes) && !hasCatalogError) {
+        setLlmModelsError((catalogRes && (catalogRes.msg || catalogRes.msg_show)) || '');
+      }
+    }).catch((err) => {
+      setLlmModels([]);
+      setLlmModelsError(
+        formatMessage({ id: 'componentOverview.body.CreateComponentModal.llm_fetch_failed' })
+      );
+      handleAPIError(err);
+    }).finally(() => {
+      setLlmModelsLoading(false);
+    });
+  };
+
+  const buildLlmPluginTarget = (modelKey = '') => {
+    const llmPlugin = getLlmPluginFromList(pluginsList);
+    const teamName = globalUtil.getCurrTeamName();
+    const regionName = globalUtil.getCurrRegionName();
+
+    if (!llmPlugin || !teamName || !regionName) {
+      return null;
+    }
+
+    return buildLlmPluginNavigation({
+      pluginName: llmPlugin.name,
+      teamName,
+      regionName,
+      modelKey,
+    });
+  };
+
+  const jumpToLlmPlugin = (modelKey = '') => {
+    const target = buildLlmPluginTarget(modelKey);
+
+    if (!target) {
+      return;
+    }
+
+    dispatch(routerRedux.push(target));
+    handleClose();
+    resetLlmSelectorState();
+  };
+
+  const handleOpenLlmSelector = () => {
+    setShowLlmSelectModal(true);
+    setLlmSourceType('repository');
+    setLlmSubmitLoading(false);
+    setLlmUploadFile(null);
+    setLlmRepositorySearch('');
+    setSelectedLlmRepositoryKey('');
+    setLlmForm({
+      display_name: '',
+      source_uri: '',
+      parameters: '',
+    });
+    fetchTeamLlmModelsList();
+  };
+
+  const submitLlmDownloadPayload = (payload) => {
+    const teamName = globalUtil.getCurrTeamName();
+    const regionName = globalUtil.getCurrRegionName();
+
+    if (!teamName || !regionName) {
+      return;
+    }
+
+    if (!payload.source_uri) {
+      message.warning('当前模型缺少可用来源，请改用魔搭或上传');
+      return;
+    }
+
+    const namespace = resolveCurrentTeamNamespace(currentUser, teamName);
+
+    setLlmSubmitLoading(true);
+    createTeamLlmDownload({
+      team_name: teamName,
+      region_name: regionName,
+      namespace,
+      data: payload,
+    }).then((res) => {
+      setLlmSubmitLoading(false);
+      if (isAiEngineSuccess(res)) {
+        message.success(`${payload.display_name || payload.model_id} 已开始下载`);
+        jumpToLlmPlugin();
+        return;
+      }
+
+      message.error((res && (res.msg || res.msg_show)) || '下载模型失败');
+    }).catch((err) => {
+      setLlmSubmitLoading(false);
+      handleAPIError(err);
+    });
+  };
+
+  const handleLlmRepositoryAction = (entry) => {
+    const asset = entry && entry.asset;
+    const model = entry && entry.model;
+    const status = normalizeLlmModelStatus(asset && asset.status);
+
+    if (asset && status === 'ready') {
+      jumpToLlmPlugin(asset.model_key);
+      return;
+    }
+
+    if (model) {
+      const payload = buildLlmCatalogDownloadPayload(model);
+      if (!payload.source_uri) {
+        message.warning('当前模型缺少可用来源，请改用手动部署');
+        return;
+      }
+      submitLlmDownloadPayload(payload);
+      return;
+    }
+
+    const payload = buildLlmAssetDownloadPayload(asset);
+    if (!payload.source_uri) {
+      message.warning('当前模型缺少可用来源，请改用魔搭或上传');
+      return;
+    }
+    submitLlmDownloadPayload(payload);
+  };
+
+  const getLlmRepositoryEntryKey = (entry = {}) => {
+    if (entry.key) {
+      return entry.key;
+    }
+    const model = entry.model || {};
+    const asset = entry.asset || {};
+    return asset.model_key || model.model_id || model.model_key || model.display_name || '';
+  };
+
+  const getFilteredLlmRepositoryEntries = () => {
+    const keyword = String(llmRepositorySearch || '').trim().toLowerCase();
+    if (!keyword) {
+      return llmModels;
+    }
+
+    return llmModels.filter((entry) => {
+      const model = entry.model || entry.asset || {};
+      const asset = entry.asset || {};
+      return [
+        model.display_name,
+        model.model_id,
+        model.description,
+        model.model_source,
+        model.source_uri,
+        model.provider,
+        model.registry_provider,
+        model.parameters,
+        asset.model_key,
+        asset.local_path,
+        asset.source_uri,
+        asset.parameters,
+        asset.display_name,
+        asset.model_id,
+        asset.source_type,
+      ].filter(Boolean).join(' ').toLowerCase().includes(keyword);
+    });
+  };
+
+  const getSelectedLlmRepositoryEntry = (entries = getFilteredLlmRepositoryEntries()) => {
+    if (!selectedLlmRepositoryKey) {
+      return null;
+    }
+
+    return entries.find((entry) => getLlmRepositoryEntryKey(entry) === selectedLlmRepositoryKey) || null;
+  };
+
+  const getLlmRepositoryActionMeta = () => {
+    const selectedLlmRepositoryEntry = getSelectedLlmRepositoryEntry();
+    if (!selectedLlmRepositoryEntry) {
+      return { label: '请选择模型', disabled: true };
+    }
+
+    const asset = selectedLlmRepositoryEntry.asset;
+    const status = normalizeLlmModelStatus(asset && asset.status);
+
+    if (asset && status === 'ready') {
+      return { label: '部署', disabled: false };
+    }
+    if (['downloading', 'deleting'].includes(status)) {
+      return {
+        label: status === 'deleting' ? '删除中' : '下载中',
+        disabled: true,
+      };
+    }
+
+    return { label: '下载', disabled: false };
+  };
+
+  const handleLlmRepositoryPrimaryAction = () => {
+    const selectedLlmRepositoryEntry = getSelectedLlmRepositoryEntry();
+    if (!selectedLlmRepositoryEntry) {
+      message.warning('请选择一个模型');
+      return;
+    }
+
+    handleLlmRepositoryAction(selectedLlmRepositoryEntry);
+  };
+
+  const handleLlmFormChange = (field, value) => {
+    setLlmForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleConfirmLlmSelection = () => {
+    const teamName = globalUtil.getCurrTeamName();
+    const regionName = globalUtil.getCurrRegionName();
+
+    if (!teamName || !regionName) {
+      return;
+    }
+
+    const namespace = resolveCurrentTeamNamespace(currentUser, teamName);
+
+    if (llmSourceType === 'repository') {
+      return;
+    }
+
+    setLlmSubmitLoading(true);
+
+    if (llmSourceType === 'upload') {
+      if (!llmUploadFile) {
+        setLlmSubmitLoading(false);
+        message.warning('请选择要部署的模型包文件');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', llmUploadFile);
+      formData.append('display_name', String(llmForm.display_name || '').trim());
+      formData.append('engine_type', 'vLLM');
+      formData.append('parameters', String(llmForm.parameters || '').trim());
+
+      uploadTeamLlmArtifact({
+        team_name: teamName,
+        region_name: regionName,
+        namespace,
+        formData,
+      }).then((res) => {
+        if (isAiEngineSuccess(res)) {
+          message.success('模型已开始部署');
+          jumpToLlmPlugin();
+          return;
+        }
+
+        setLlmSubmitLoading(false);
+        message.error((res && (res.msg || res.msg_show)) || '部署模型失败');
+      }).catch((err) => {
+        setLlmSubmitLoading(false);
+        handleAPIError(err);
+      });
+      return;
+    }
+
+    if (!String(llmForm.source_uri || '').trim()) {
+      setLlmSubmitLoading(false);
+      message.warning('请输入魔搭模型地址');
+      return;
+    }
+
+    createTeamLlmDownload({
+      team_name: teamName,
+      region_name: regionName,
+      namespace,
+      data: {
+        display_name: String(llmForm.display_name || '').trim(),
+        source_type: llmSourceType,
+        source_uri: String(llmForm.source_uri || '').trim(),
+        engine_type: 'vLLM',
+        parameters: String(llmForm.parameters || '').trim(),
+      },
+    }).then((res) => {
+      if (isAiEngineSuccess(res)) {
+        message.success('模型已开始部署');
+        jumpToLlmPlugin();
+        return;
+      }
+
+      setLlmSubmitLoading(false);
+      message.error((res && (res.msg || res.msg_show)) || '部署模型失败');
+    }).catch((err) => {
+      setLlmSubmitLoading(false);
+      handleAPIError(err);
+    });
+  };
+
+  // 监听滚动事件进行自动加载 - 商店应用
+  useEffect(() => {
+    if (currentView !== 'marketStore') {
+      return;
+    }
+
+    let cleanup = null;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    // 使用轮询方式等待 ref 准备好
+    const tryBindScroll = () => {
+      attempts++;
+      const marketContainer = marketListRef.current;
+
+      if (!marketContainer) {
+        if (attempts < maxAttempts) {
+          setTimeout(tryBindScroll, 200);
+        }
+        return;
+      }
+
+      // ref 已准备好,绑定滚动事件
+      const handleMarketScroll = () => {
+        const container = marketListRef.current;
+        if (!container) return;
+
+        const scrollTop = container.scrollTop;
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+        const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+
+        // 当滚动到底部附近(距离底部小于100px)时,加载下一页
+        if (distanceToBottom < 100) {
+          setMarketLoadingMore(prev => {
+            if (!prev) {
+              return true;
+            }
+            return prev;
+          });
+        }
+      };
+
+      marketContainer.addEventListener('scroll', handleMarketScroll);
+
+      // 保存清理函数
+      cleanup = () => {
+        marketContainer.removeEventListener('scroll', handleMarketScroll);
+      };
+    };
+
+    // 开始尝试绑定
+    tryBindScroll();
+
+    return () => {
+      if (cleanup) {
+        cleanup();
+      }
+    };
+  }, [currentView, marketLoading]);
+
+  // 当 marketLoadingMore 变为 true 时,触发数据加载
+  useEffect(() => {
+    if (marketLoadingMore && marketHasMore && currentView === 'marketStore') {
+      const nextPage = marketPage + 1;
+      setMarketPage(nextPage);
+      fetchMarketApps(selectedStore?.name, nextPage, marketSearchValue);
+    }
+  }, [marketLoadingMore]);
+
+  // 监听滚动事件进行自动加载 - 本地组件库
+  useEffect(() => {
+    if (currentView !== 'localMarket') {
+      return;
+    }
+
+    let cleanup = null;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    // 使用轮询方式等待 ref 准备好
+    const tryBindScroll = () => {
+      attempts++;
+      const localContainer = localMarketListRef.current;
+
+      if (!localContainer) {
+        if (attempts < maxAttempts) {
+          setTimeout(tryBindScroll, 200);
+        }
+        return;
+      }
+
+      // ref 已准备好,绑定滚动事件
+      const handleLocalMarketScroll = () => {
+        const container = localMarketListRef.current;
+        if (!container) return;
+
+        const scrollTop = container.scrollTop;
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+        const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+
+        // 当滚动到底部附近(距离底部小于100px)时,加载下一页
+        if (distanceToBottom < 100) {
+          setLocalMarketLoadingMore(prev => {
+            if (!prev) {
+              return true;
+            }
+            return prev;
+          });
+        }
+      };
+
+      localContainer.addEventListener('scroll', handleLocalMarketScroll);
+
+      // 保存清理函数
+      cleanup = () => {
+        localContainer.removeEventListener('scroll', handleLocalMarketScroll);
+      };
+    };
+
+    // 开始尝试绑定
+    tryBindScroll();
+
+    return () => {
+      if (cleanup) {
+        cleanup();
+      }
+    };
+  }, [currentView, localMarketLoading]);
+
+  // 当 localMarketLoadingMore 变为 true 时,触发数据加载
+  useEffect(() => {
+    if (localMarketLoadingMore && localMarketHasMore && currentView === 'localMarket') {
+      const nextPage = localMarketPage + 1;
+      setLocalMarketPage(nextPage);
+      fetchLocalMarketApps(nextPage, localMarketSearchValue, localMarketActiveTab);
+    }
+  }, [localMarketLoadingMore]);
+
+  useEffect(() => {
+    if (visible && currentView === 'form') {
+      if (currentFormType === 'docker') {
+        fetchLocalImageList();
+      } else {
+        setLocalImageList([]);
+      }
+      fetchArchInfo();
+      if (currentFormType === 'vm') {
+        fetchVirtualMachineImages();
+      }
+    }
+  }, [visible, currentView, currentFormType]);
+
+  // 当弹窗打开时，获取可用插件
+  useEffect(() => {
+    fetchArchInfo();
+    if (visible && pluginsList) {
+      fetchAvailablePlugins();
+    }
+  }, [visible, pluginsList]);
+
+  useEffect(() => {
+    if (visible && currentEnterprise?.enterprise_id) {
+      fetchMarketStores();
+    }
+  }, [visible, currentEnterprise]);
+
+  // 处理 URL 传入的 initialView 参数
+  useEffect(() => {
+    if (visible) {
+      // 只在首次打开弹窗时处理 initialView
+      if (!hasInitialized) {
+        if (initialView) {
+          // 根据 initialView 设置对应的视图
+          setCurrentView(initialView);
+
+          // 根据不同的视图类型，预加载必要的数据
+          switch (initialView) {
+            case 'market':
+              fetchMarketStores();
+              break;
+            case 'marketStore':
+              // 需要先获取商店列表
+              fetchMarketStores();
+              break;
+            case 'localMarket':
+              // 直接获取本地组件库列表
+              fetchLocalMarketApps(1, '', 'all');
+              break;
+            case 'localMarketInstall':
+              // localMarketInstall 需要先选中一个应用才能进入安装页面
+              // 如果没有 selectedLocalApp，则跳转到 localMarket 列表视图
+              // 用户需要先在列表中选择一个应用，然后点击安装按钮
+              setCurrentView('localMarket');
+              fetchLocalMarketApps(1, '', 'all');
+              break;
+            case 'image':
+              fetchImageHubs();
+              fetchClusters();
+              break;
+            case 'code':
+              fetchEnterpriseInfo();
+              break;
+            case 'database':
+              fetchDatabaseTypes();
+              break;
+            case 'form':
+              fetchArchInfo();
+              break;
+            default:
+              break;
+          }
+        } else {
+          // 如果没有 initialView，重置为主视图
+          resetViewHistory();
+          setCurrentView('main');
+        }
+        setHasInitialized(true);
+      }
+    } else {
+      // 弹窗关闭时，重置所有状态
+      resetViewHistory();
+      setCurrentView('main');
+      setSelectedPlugin(null);
+      setSelectedStore(null);
+      setSelectedMarketApp(null);
+      setSelectedLocalApp(null);
+      setMarketApps([]);
+      setLocalMarketApps([]);
+      setMarketSearchValue('');
+      setLocalMarketSearchValue('');
+      setMarketPage(1);
+      setLocalMarketPage(1);
+      setLocalMarketActiveTab('all');
+      setCurrentFormType('');
+      setHasInitialized(false); // 重置初始化标志
+      resetLlmSelectorState();
+    }
+  }, [visible, initialView, hasInitialized]);
+
+  const handleDatabaseEntryClick = () => {
+    const hasDatabasePlugin = PluginUtils.isInstallPlugin(pluginsList, 'rainbond-databases');
+    const regionName = globalUtil.getCurrRegionName();
+
+    if (hasDatabasePlugin) {
+      pushViewHistory('database');
+      fetchDatabaseTypes();
+      return;
+    }
+
+    if (currentUser?.is_enterprise_admin && currentUser?.enterprise_id) {
+      Modal.confirm({
+        title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.database_install_required' }),
+        content: formatMessage({ id: 'componentOverview.body.CreateComponentModal.database_install_confirm_desc' }),
+        onOk: () => {
+          dispatch(
+            routerRedux.push(
+              `/enterprise/${currentUser.enterprise_id}/extension?regionName=${regionName}`
+            )
+          );
+          onCancel();
+        }
+      });
+      return;
+    }
+
+    Modal.warning({
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.database_contact_admin_title' }),
+      content: formatMessage({ id: 'componentOverview.body.CreateComponentModal.database_contact_admin_desc' })
+    });
+  };
+
+  const handleLlmEntryClick = () => {
+    const hasLlmPlugin = PluginUtils.isInstallPlugin(pluginsList, 'rainbond-ai-engine');
+    const teamName = globalUtil.getCurrTeamName();
+    const regionName = globalUtil.getCurrRegionName();
+
+    if (hasLlmPlugin) {
+      dispatch(
+        routerRedux.push(
+          `/team/${teamName}/region/${regionName}/plugins/rainbond-ai-engine`
+        )
+      );
+      onCancel();
+      return;
+    }
+
+    if (currentUser?.is_enterprise_admin && currentUser?.enterprise_id) {
+      Modal.confirm({
+        title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.llm_install_required' }),
+        content: formatMessage({ id: 'componentOverview.body.CreateComponentModal.llm_install_confirm_desc' }),
+        onOk: () => {
+          dispatch(
+            routerRedux.push(
+              `/enterprise/${currentUser.enterprise_id}/extension?regionName=${regionName}`
+            )
+          );
+          onCancel();
+        }
+      });
+      return;
+    }
+
+    Modal.warning({
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.llm_contact_admin_title' }),
+      content: formatMessage({ id: 'componentOverview.body.CreateComponentModal.llm_contact_admin_desc' })
+    });
+  };
+
+  const handleVmEntryClick = () => {
+    const hasVmPlugin = PluginUtils.isInstallPlugin(pluginsList, 'rainbond-vm');
+    const regionName = globalUtil.getCurrRegionName();
+
+    if (hasVmPlugin) {
+      setCurrentFormType('vm');
+      pushViewHistory('form');
+      return;
+    }
+
+    if (currentUser?.is_enterprise_admin && currentUser?.enterprise_id) {
+      Modal.confirm({
+        title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.vm_install_required' }),
+        content: formatMessage({ id: 'componentOverview.body.CreateComponentModal.vm_install_confirm_desc' }),
+        onOk: () => {
+          dispatch(
+            routerRedux.push(
+              `/enterprise/${currentUser.enterprise_id}/extension?regionName=${regionName}`
+            )
+          );
+          onCancel();
+        }
+      });
+      return;
+    }
+
+    Modal.warning({
+      title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.vm_contact_admin_title' }),
+      content: formatMessage({ id: 'componentOverview.body.CreateComponentModal.vm_contact_admin_desc' })
+    });
+  };
+
+  const handleItemClick = (item) => {
+    if (item.key === 'llm-display') {
+      handleOpenLlmSelector();
+      return;
+    }
+    if (item.key === 'database') {
+      handleDatabaseEntryClick();
+      return;
+    }
+    if (item.displayOnly) {
+      return;
+    }
+    if (item.key === 'llm') {
+      handleLlmEntryClick();
+      return;
+    }
+    if (item.key === 'vm') {
+      handleVmEntryClick();
+      return;
+    }
+    if (item.hasSubMenu) {
+      pushViewHistory(item.key);
+      // 如果切换到市场视图,获取商店列表
+      if (item.key === 'market') {
+        fetchMarketStores();
+      }
+      // 如果切换到镜像视图,获取镜像仓库列表和集群列表
+      if (item.key === 'image') {
+        fetchImageHubs();
+        fetchClusters();
+      }
+      // 如果切换到源码视图,获取企业信息(包含源码仓库列表)
+      if (item.key === 'code') {
+        fetchEnterpriseInfo();
+      }
+      // 如果切换到数据库视图,获取数据库类型列表
+      if (item.key === 'database') {
+        fetchDatabaseTypes();
+      }
+      return;
+    }
+    // 如果标记了需要显示应用列表(点击商店)
+    if (item.showMarketModal && item.storeName) {
+      const store = marketStores.find(s => s.name === item.storeName);
+      setSelectedStore(store);
+      pushViewHistory('marketStore');
+      // 获取该商店的应用列表
+      fetchMarketApps(store.name);
+      return;
+    }
+
+    // 如果标记了需要显示本地组件库
+    if (item.showLocalMarketModal) {
+      pushViewHistory('localMarket');
+      // 获取本地组件库列表
+      fetchLocalMarketApps(1, '', 'all');
+      return;
+    }
+
+    // 如果标记了需要显示私有镜像仓库
+    if (item.showImgRepostory && item.secretId) {
+      const hub = imageHubList.find(h => h.secret_id === item.secretId);
+      setSelectedImageHub(hub);
+      pushViewHistory('imageRepo');
+      return;
+    }
+
+    // 如果标记了需要显示ThirdList(OAuth源码仓库列表)
+    if (item.showThirdList && item.oauthService) {
+      setSelectedOauthService(item.oauthService);
+      pushViewHistory('thirdList');
+      return;
+    }
+
+    // 如果标记了需要显示插件弹窗
+    if (item.showPluginModal && item.plugin) {
+      handlePluginClick(item.plugin);
+      return;
+    }
+
+    if (item.navigateToResourceCenterHelm) {
+      const teamName = globalUtil.getCurrTeamName();
+      const regionName = globalUtil.getCurrRegionName();
+      dispatch(
+        routerRedux.push({
+          pathname: `/team/${teamName}/region/${regionName}/k8s-center`,
+          query: {
+            tab: 'helm',
+            openHelmInstall: 'true'
+          }
+        })
+      );
+      onCancel();
+      return;
+    }
+
+    if (item.navigateToResourceCenterWorkloadCreate) {
+      const teamName = globalUtil.getCurrTeamName();
+      const regionName = globalUtil.getCurrRegionName();
+      dispatch(
+        routerRedux.push({
+          pathname: `/team/${teamName}/region/${regionName}/k8s-center`,
+          query: {
+            tab: 'workload',
+            openCreateResource: 'true'
+          }
+        })
+      );
+      onCancel();
+      return;
+    }
+
+    // 如果标记了需要显示表单
+    if (item.showForm) {
+      setCurrentFormType(item.formType);
+      // 如果有 databaseType 字段，说明是数据库类型，需要设置数据库类型
+      if (item.databaseType) {
+        setCurrentDatabaseType(item.databaseType);
+      }
+      pushViewHistory('form');
+      return;
+    }
+
+    // 如果有路径,跳转到对应页面
+    if (item.path) {
+      const teamName = globalUtil.getCurrTeamName();
+      const regionName = globalUtil.getCurrRegionName();
+      dispatch(
+        routerRedux.push(
+          `/team/${teamName}/region/${regionName}/${item.path}`
+        )
+      );
+      onCancel();
+    }
+  };
+
+  const handleBack = () => {
+    if (currentView === 'form') {
+      setCurrentFormType('');
+      popViewHistory();
+    } else if (currentView === 'plugin') {
+      setSelectedPlugin(null);
+      popViewHistory();
+    } else if (currentView === 'thirdList') {
+      // 检查 ThirdList 是否正在显示表单
+      if (thirdListFormRef.current && thirdListFormRef.current.isShowingForm && thirdListFormRef.current.isShowingForm()) {
+        // 如果正在显示表单，返回到列表视图
+        thirdListFormRef.current.backToList();
+      } else {
+        setSelectedOauthService(null);
+        popViewHistory();
+      }
+    } else if (currentView === 'imageRepo') {
+      setSelectedImageHub(null);
+      popViewHistory();
+    } else if (currentView === 'marketInstall') {
+      setSelectedMarketApp(null);
+      popViewHistory();
+    } else if (currentView === 'marketStore') {
+      setSelectedStore(null);
+      setMarketApps([]);
+      setMarketSearchValue('');
+      setMarketPage(1);
+      popViewHistory();
+    } else if (currentView === 'localMarketInstall') {
+      setSelectedLocalApp(null);
+      popViewHistory();
+    } else if (currentView === 'localMarket') {
+      setLocalMarketApps([]);
+      setLocalMarketSearchValue('');
+      setLocalMarketPage(1);
+      setLocalMarketActiveTab('all');
+      popViewHistory();
+    } else {
+      popViewHistory();
+    }
+  };
+
+  const handleClose = () => {
+    resetViewHistory();
+    setCurrentView('main');
+    setSelectedPlugin(null);
+    onCancel();
+  };
+
+  const handleOpenAddImageRegistry = () => {
+    setShowAddImageRegistry(true);
+  };
+
+  const handleCloseAddImageRegistry = () => {
+    setShowAddImageRegistry(false);
+  };
+
+  const handleAddImageRegistry = (values) => {
+    setImageHubLoading(true);
+    dispatch({
+      type: 'global/addPlatformImageHub',
+      payload: {
+        secret_id: values.secret_id,
+        domain: values.domain,
+        username: values.username,
+        password: values.password,
+        hub_type: values.hub_type
+      },
+      callback: res => {
+        if (res && res.response_data && res.response_data.code == 200) {
+          // 添加成功后重新获取镜像仓库列表
+          fetchImageHubs();
+        }
+        setImageHubLoading(false);
+        handleCloseAddImageRegistry();
+      },
+      handleError: err => {
+        setImageHubLoading(false);
+        handleAPIError(err);
+      }
+    });
+  };
+
+  const handleOpenAddOauth = () => {
+    setShowAddOauth(true);
+  };
+
+  const handleCloseAddOauth = () => {
+    setShowAddOauth(false);
+  };
+
+  const handleCreatOauth = (values) => {
+    const { oauth_type, redirect_domain, ...rest } = values;
+    const homeUrls = {
+      github: 'https://github.com',
+      aliyun: 'https://oauth.aliyun.com',
+      dingtalk: 'https://oapi.dingtalk.com'
+    };
+
+    const oauthData = {
+      ...rest,
+      oauth_type: oauth_type.toLowerCase(),
+      home_url: homeUrls[oauth_type.toLowerCase()] || '',
+      redirect_uri: `${redirect_domain}/console/oauth/redirect`,
+      is_auto_login: false,
+      is_console: true,
+      eid: currentUser?.enterprise_id,
+      service_id: null,
+      enable: true,
+      system: false
+    };
+
+    const updatedTable = [...oauthTable, oauthData];
+
+    dispatch({
+      type: 'global/creatOauth',
+      payload: {
+        enterprise_id: currentUser?.enterprise_id,
+        arr: updatedTable
+      },
+      callback: data => {
+        if (data && data.status_code === 200) {
+          handleCloseAddOauth();
+          // 刷新企业信息以获取最新的OAuth仓库列表
+          fetchEnterpriseInfo();
+        }
+      },
+      handleError: err => {
+        handleAPIError(err);
+      }
+    });
+  };
+
+  // 导入插件
+  const importPlugin = (plugin) => {
+    // 防止重复导入同一个插件
+    if (importingPlugin === plugin.name) {
+      return;
+    }
+
+    setImportingPlugin(plugin.name);
+    setPluginLoading(true);
+    setPluginError(false);
+
+    const regionName = globalUtil.getCurrRegionName();
+
+    importAppPagePlugin(plugin, regionName, 'team').then(res => {
+      setImportingPlugin(null);
+      setPluginApp(res);
+      setPluginLoading(false);
+      setPluginError(false);
+    }).catch(err => {
+      setImportingPlugin(null);
+      setPluginErrInfo(err?.response?.data?.message || err?.message || "An unexpected error occurred.");
+      setPluginLoading(false);
+      setPluginError(true);
+    });
+  };
+
+  // 处理插件点击
+  const handlePluginClick = (plugin) => {
+    setSelectedPlugin(plugin);
+    pushViewHistory('plugin');
+    setPluginApp({});
+    setPluginLoading(true);
+    setPluginError(false);
+    setPluginErrInfo('');
+
+    // 对于JSInject类型的插件，开始导入
+    if (plugin.plugin_type === 'JSInject') {
+      setTimeout(() => {
+        importPlugin(plugin);
+      }, 50);
+    } else {
+      // iframe类型插件直接加载完成
+      setPluginLoading(false);
+    }
+  };
+
+  // 关闭插件弹窗
+  const handlePluginModalClose = () => {
+    setPluginModalVisible(false);
+    setSelectedPlugin(null);
+    setPluginBaseInfoExtras(null);
+    setPluginApp({});
+    setPluginLoading(true);
+    setPluginError(false);
+    setPluginErrInfo('');
+    setImportingPlugin(null);
+  };
+
+  const handleFormSubmit = (value, event_id) => {
+    const teamName = globalUtil.getCurrTeamName();
+    const regionName = globalUtil.getCurrRegionName();
+
+    if (currentFormType === 'docker-compose') {
+      // Docker Compose 提交
+      dispatch({
+        type: 'createApp/createAppByCompose',
+        payload: {
+          team_name: teamName,
+          image_type: 'docker_compose',
+          ...value,
+        },
+        callback: data => {
+          const { group_id, compose_id, app_name } = data.bean;
+          const query = [];
+          if (app_name) {
+            query.push(`app_name=${encodeURIComponent(app_name)}`);
+          }
+          if (value.arch) {
+            query.push(`arch=${encodeURIComponent(value.arch)}`);
+          }
+          const queryString = query.length ? `?${query.join('&')}` : '';
+          dispatch(
+            routerRedux.push(
+              `/team/${teamName}/region/${regionName}/create/create-compose-check/${group_id}/${compose_id}${queryString}`
+            )
+          );
+          onCancel();
+        },
+        handleError: err => {
+          handleAPIError(err);
+        }
+      });
+    } else if (currentFormType === 'database') {
+      dispatch(routerRedux.push(`/team/${teamName}/region/${regionName}/create/database-config/?database_type=${currentDatabaseType}&group_id=${value.group_id}&k8s_component_name=${value.k8s_component_name}&service_cname=${value.service_cname}`));
+    } else if (currentFormType === 'vm') {
+      dispatch({
+        type: 'createApp/createAppByVirtualMachine',
+        payload: {
+          team_name: teamName,
+          event_id,
+          ...value
+        },
+        callback: data => {
+          if (data) {
+            const appAlias = data.bean.service_alias;
+            dispatch(routerRedux.push(`/team/${teamName}/region/${regionName}/create/create-check/${appAlias}`));
+            onCancel();
+          }
+        },
+        handleError: err => {
+          handleAPIError(err);
+        }
+      });
+    } else if (currentFormType === 'code-custom') {
+      // 源码提交
+      const username = value.username_1;
+      const password = value.password_1;
+      delete value.username_1;
+      delete value.password_1;
+      dispatch({
+        type: 'createApp/createAppByCode',
+        payload: {
+          team_name: teamName,
+          code_from: 'gitlab_manual',
+          ...value,
+          username,
+          password
+        },
+        callback: data => {
+          if (data) {
+            const appAlias = data.bean.service_alias;
+            dispatch(routerRedux.push(`/team/${teamName}/region/${regionName}/create/create-check/${appAlias}`));
+            onCancel();
+          }
+        },
+        handleError: err => {
+          handleAPIError(err);
+        }
+      });
+    } else if (currentFormType === 'code-jwar') {
+      // 软件包提交
+      dispatch({
+        type: "createApp/createJarWarFormSubmit",
+        payload: {
+          region_name: regionName,
+          team_name: teamName,
+          event_id,
+          ...value
+        },
+        callback: (data) => {
+          const appAlias = data && data.bean.service_alias;
+          dispatch(routerRedux.push(`/team/${teamName}/region/${regionName}/create/create-check/${appAlias}?event_id=${event_id}`));
+          onCancel();
+        },
+        handleError: err => {
+          handleAPIError(err);
+        }
+      });
+    } else if (currentFormType === 'yaml') {
+      // Yaml 提交
+      dispatch(
+        routerRedux.push(
+          `/team/${teamName}/region/${regionName}/importMessageYaml?event_id=${event_id}&group_id=${value.group_id}&group_name=${value.group_name}`
+        )
+      );
+      onCancel();
+    } else if (currentFormType === 'helm') {
+      // Helm 提交
+      if (value.imagefrom === 'cmd') {
+        dispatch({
+          type: "market/HelmwaRehouseAddCom",
+          payload: {
+            team_name: teamName,
+            app_id: value.group_id,
+            command: value.helm_cmd
+          },
+          callback: res => {
+            if (res && res.status_code === 200) {
+              const info = res.bean;
+              if (info.command === "install") {
+                const obj = {
+                  app_store_name: info.repo_name,
+                  app_template_name: info.chart_name,
+                  version: info.version,
+                  overrides: info.overrides,
+                };
+                window.sessionStorage.setItem('appinfo', JSON.stringify(obj));
+                dispatch(
+                  routerRedux.push(
+                    `/team/${teamName}/region/${regionName}/apps/${value.group_id}/helminstall?installPath=cmd`
+                  )
+                );
+              }
+              onCancel();
+            }
+          },
+          handleError: err => {
+            handleAPIError(err);
+          }
+        });
+      } else {
+        dispatch(
+          routerRedux.push(
+            `/team/${teamName}/region/${regionName}/apps/${value.group_id}/helminstall?installPath=upload&event_id=${value.event_id}`
+          )
+        );
+        onCancel();
+      }
+    } else if (currentFormType === 'third-party') {
+      // 第三方组件提交
+      dispatch({
+        type: 'createApp/createThirdPartyServices',
+        payload: {
+          team_name: teamName,
+          group_id: value.group_id,
+          service_cname: value.service_cname,
+          ...value
+        },
+        callback: data => {
+          if (data) {
+            const appAlias = data.bean.service_alias;
+            dispatch(
+              routerRedux.push(
+                `/team/${teamName}/region/${regionName}/create/create-check/${appAlias}?group_id=${value.group_id}`
+              )
+            );
+            onCancel();
+          }
+        },
+        handleError: err => {
+          handleAPIError(err);
+        }
+      });
+    } else {
+      // 容器镜像提交
+      dispatch({
+        type: "createApp/createAppByDockerrun",
+        payload: {
+          team_name: teamName,
+          image_type: "docker_image",
+          ...value,
+        },
+        callback: (data) => {
+          const appAlias = data && data.bean.service_alias;
+          dispatch(routerRedux.push(`/team/${teamName}/region/${regionName}/create/create-check/${appAlias}`));
+          onCancel();
+        },
+        handleError: err => {
+          handleAPIError(err);
+        }
+      });
+    }
+  };
+
+  const handleInstallApp = (value, event_id) => {
+    if (value.group_id) {
+      // 已有应用
+      handleFormSubmit(value, event_id);
+    } else {
+      // 新建应用再创建组件
+      const teamName = globalUtil.getCurrTeamName();
+      const regionName = globalUtil.getCurrRegionName();
+      dispatch({
+        type: 'application/addGroup',
+        payload: {
+          region_name: regionName,
+          team_name: teamName,
+          group_name: value.group_name,
+          k8s_app: value.k8s_app,
+          note: '',
+        },
+        callback: (res) => {
+          if (res && res.group_id) {
+            value.group_id = res.group_id;
+            handleFormSubmit(value, event_id);
+          }
+        },
+        handleError: err => {
+          handleAPIError(err);
+        }
+      });
+    }
+  };
+
+  // 处理从ThirdList提交(OAuth仓库项目)
+  const handleThirdListSubmit = (value) => {
+    const teamName = globalUtil.getCurrTeamName();
+    const regionName = globalUtil.getCurrRegionName();
+
+    const payload = {
+      service_id: selectedOauthService.service_id,
+      code_version: value.code_version,
+      git_url: value.project_url,
+      group_id: value.group_id,
+      server_type: 'git',
+      service_cname: value.service_cname,
+      is_oauth: true,
+      git_project_id: value.project_id,
+      team_name: teamName,
+      open_webhook: value.open_webhook,
+      full_name: value.project_full_name,
+      k8s_component_name: value.k8s_component_name,
+      arch: value.arch,
+    };
+
+    const createThirdApp = () => {
+      dispatch({
+        type: 'createApp/createThirtAppByCode',
+        payload,
+        callback: data => {
+          const appAlias = data && data.bean.service_alias;
+          dispatch(
+            routerRedux.push(
+              `/team/${teamName}/region/${regionName}/create/create-check/${appAlias}`
+            )
+          );
+          onCancel();
+        },
+        handleError: err => {
+          handleAPIError(err);
+        }
+      });
+    };
+
+    if (value.group_id) {
+      // 已有应用,直接创建组件
+      createThirdApp();
+    } else {
+      // 新建应用再创建组件
+      dispatch({
+        type: 'application/addGroup',
+        payload: {
+          region_name: regionName,
+          team_name: teamName,
+          group_name: value.group_name,
+          k8s_app: value.k8s_app,
+          note: '',
+        },
+        callback: (res) => {
+          if (res && res.group_id) {
+            payload.group_id = res.group_id;
+            createThirdApp();
+          }
+        },
+        handleError: err => {
+          handleAPIError(err);
+        }
+      });
+    }
+  };
+
+  const getTitle = () => {
+    switch (currentView) {
+      case 'market':
+        return formatMessage({ id: 'componentOverview.body.CreateComponentModal.from_market' });
+      case 'marketStore':
+        return selectedStore ? selectedStore.alias || selectedStore.name : formatMessage({ id: 'componentOverview.body.CreateComponentModal.market_store' });
+      case 'marketInstall':
+        return selectedMarketApp ? formatMessage({ id: 'componentOverview.body.CreateComponentModal.install_app' }, { name: selectedMarketApp.app_name || selectedMarketApp.name }) : formatMessage({ id: 'componentOverview.body.CreateComponentModal.install' });
+      case 'localMarket':
+        return formatMessage({ id: 'componentOverview.body.CreateComponentModal.local_market' });
+      case 'localMarketInstall':
+        return selectedLocalApp ? formatMessage({ id: 'componentOverview.body.CreateComponentModal.install_app' }, { name: selectedLocalApp.app_name || selectedLocalApp.name }) : formatMessage({ id: 'componentOverview.body.CreateComponentModal.install' });
+      case 'image':
+        return formatMessage({ id: 'componentOverview.body.CreateComponentModal.from_image' });
+      case 'imageRepo':
+        return selectedImageHub ? `${selectedImageHub.hub_type} (${selectedImageHub.secret_id})` : formatMessage({ id: 'componentOverview.body.CreateComponentModal.private_image_repo' });
+      case 'code':
+        return formatMessage({ id: 'componentOverview.body.CreateComponentModal.from_source' });
+      case 'yaml':
+        return 'Yaml Helm K8s';
+      case 'plugin':
+        return selectedPlugin?.display_name || selectedPlugin?.alias || selectedPlugin?.name || formatMessage({ id: 'componentOverview.body.CreateComponentModal.plugin' });
+      case 'thirdList':
+        return selectedOauthService ? formatMessage({ id: 'componentOverview.body.CreateComponentModal.repo' }, { name: selectedOauthService.name }) : formatMessage({ id: 'componentOverview.body.CreateComponentModal.source_repo' });
+      case 'form':
+        if (currentFormType === 'docker') return formatMessage({ id: 'componentOverview.body.CreateComponentModal.container' });
+        if (currentFormType === 'docker-compose') return formatMessage({ id: 'componentOverview.body.CreateComponentModal.docker_compose' });
+        if (currentFormType === 'code-custom') return formatMessage({ id: 'componentOverview.body.CreateComponentModal.source_code' });
+        if (currentFormType === 'code-jwar') return formatMessage({ id: 'componentOverview.body.CreateComponentModal.package' });
+        if (currentFormType === 'yaml') return formatMessage({ id: 'componentOverview.body.CreateComponentModal.yaml' });
+        if (currentFormType === 'helm') return formatMessage({ id: 'componentOverview.body.CreateComponentModal.helm' });
+        if (currentFormType === 'third-party') return formatMessage({ id: 'componentOverview.body.CreateComponentModal.third_party' });
+        if (currentFormType === 'database') return formatMessage({ id: 'componentOverview.body.CreateComponentModal.database' });
+        if (currentFormType === 'vm') return formatMessage({ id: 'componentOverview.body.CreateComponentModal.vm' });
+        return formatMessage({ id: 'componentOverview.body.CreateComponentModal.create_component' });
+      default:
+        return formatMessage({ id: 'componentOverview.body.CreateComponentModal.create_component' });
+    }
+  };
+
+  const getCurrentItems = () => {
+    switch (currentView) {
+      case 'market':
+        return marketSubItems;
+      case 'image':
+        return imageSubItems;
+      case 'code':
+        return codeSubItems;
+      case 'yaml':
+        return yamlSubItems;
+      case 'database':
+        return databaseSubItems;
+      default:
+        return menuItems;
+    }
+  };
+
+  const getAddSectionConfig = () => {
+    switch (currentView) {
+      case 'image':
+        return {
+          title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.add_private_image' }),
+          desc: formatMessage({ id: 'componentOverview.body.CreateComponentModal.add_private_image_desc' })
+        };
+      case 'code':
+        return {
+          title: formatMessage({ id: 'componentOverview.body.CreateComponentModal.add_source_repo' }),
+          desc: formatMessage({ id: 'componentOverview.body.CreateComponentModal.add_source_repo_desc' })
+        };
+      default:
+        return null;
+    }
+  };
+
+  // 获取 footer
+  const getModalFooter = () => {
+    const price = selectedMarketApp?.price || 0;
+    const showSaaSPrice = PluginUtils.isInstallPlugin(pluginsList, 'rainbond-bill');
+    // 表单视图需要显示提交按钮
+    if (currentView === 'form') {
+      return (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button data-testid="rbd-comp-create-submit" type="primary" onClick={handleFooterSubmit} loading={false}>
+            {formatMessage({ id: 'componentOverview.body.CreateComponentModal.confirm_create' })}
+          </Button>
+        </div>
+      );
+    }
+
+    // 应用市场安装视图 - 左侧显示价格,右侧显示按钮
+    if (currentView === 'marketInstall') {
+      return (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '14px', color: '#595959' }}>
+            {showSaaSPrice &&
+              <>
+                <span>{formatMessage({ id: 'componentOverview.body.CreateComponentModal.estimate_daily' })}</span>
+                <span style={{ fontSize: '18px', fontWeight: 600, color: '#f5a623', marginLeft: '8px' }}>
+                  ¥{price.toFixed(2)}
+                </span>
+              </>
+            }
+
+          </div>
+          <Button type="primary" onClick={handleFooterSubmit} loading={marketSubmitLoading}>
+            {formatMessage({ id: 'componentOverview.body.CreateComponentModal.confirm_install' })}
+          </Button>
+        </div>
+      );
+    }
+
+    // 本地组件库安装视图
+    if (currentView === 'localMarketInstall') {
+      return (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '14px', color: '#595959' }}>
+            {showSaaSPrice &&
+              <>
+                <span>{formatMessage({ id: 'componentOverview.body.CreateComponentModal.estimate_daily' })}</span>
+                <span style={{ fontSize: '18px', fontWeight: 600, color: '#f5a623', marginLeft: '8px' }}>
+                  ¥{price.toFixed(2)}
+                </span>
+              </>
+            }
+          </div>
+          <Button type="primary" onClick={handleFooterSubmit} loading={localSubmitLoading}>
+            {formatMessage({ id: 'componentOverview.body.CreateComponentModal.confirm_install' })}
+          </Button>
+        </div>
+      );
+    }
+
+    // 其他视图不显示 footer
+    return null;
+  };
+
+  // 处理 footer 按钮点击
+  const handleFooterSubmit = () => {
+    // 创建一个假的事件对象
+    const fakeEvent = { preventDefault: () => { } };
+
+    if (currentView === 'marketInstall') {
+      // 应用市场安装 - 直接调用 AppMarketContent 的 handleSubmit 方法
+      if (marketInstallFormRef.current && marketInstallFormRef.current.handleSubmit) {
+        marketInstallFormRef.current.handleSubmit();
+      }
+    } else if (currentView === 'localMarketInstall') {
+      // 本地组件库安装 - 直接调用 AppMarketContent 的 handleSubmit 方法
+      if (localInstallFormRef.current && localInstallFormRef.current.handleSubmit) {
+        localInstallFormRef.current.handleSubmit();
+      }
+    } else if (currentView === 'thirdList') {
+      // ThirdList 表单提交
+      if (thirdListFormRef.current && thirdListFormRef.current.handleSubmit) {
+        thirdListFormRef.current.handleSubmit();
+      }
+    } else if (currentView === 'imageRepo') {
+      // 私有镜像仓库表单提交
+      if (imageRepoFormRef.current && imageRepoFormRef.current.getFormRef) {
+        const formRef = imageRepoFormRef.current.getFormRef();
+        if (formRef && formRef.handleSubmit) {
+          formRef.handleSubmit(fakeEvent);
+        }
+      }
+    } else if (currentView === 'form') {
+      // 根据不同的 formType 调用对应的提交方法
+      let formRef = null;
+      switch (currentFormType) {
+        case 'docker':
+          formRef = dockerFormRef.current;
+          break;
+        case 'docker-compose':
+          formRef = dockerComposeFormRef.current;
+          break;
+        case 'code-custom':
+          formRef = codeCustomFormRef.current;
+          break;
+        case 'code-jwar':
+          formRef = codeJwarFormRef.current;
+          break;
+        case 'yaml':
+          formRef = yamlFormRef.current;
+          break;
+        case 'helm':
+          formRef = helmFormRef.current;
+          break;
+        case 'third-party':
+          formRef = thirdPartyFormRef.current;
+          break;
+        case 'database':
+          formRef = databaseFormRef.current;
+          break;
+        case 'vm':
+          formRef = vmFormRef.current;
+          break;
+        default:
+          break;
+      }
+      if (formRef && formRef.handleSubmit) {
+        formRef.handleSubmit(fakeEvent);
+      }
+    }
+  };
+
+  const renderMenuItem = (item) => {
+    const isDisplayOnly = !!item.displayOnly;
+    const isRepositoryStyleMenu = currentView === 'image' || currentView === 'code';
+    const className = isDisplayOnly
+      ? `${styles.menuItem} ${isRepositoryStyleMenu ? styles.menuItemRepository : ''} ${styles.menuItemDisabled}`.trim()
+      : `${styles.menuItem} ${isRepositoryStyleMenu ? styles.menuItemRepository : ''}`.trim();
+
+    return (
+      <div
+        key={item.key}
+        data-testid={item.testid}
+        className={className}
+        onClick={() => !isDisplayOnly && handleItemClick(item)}
+        onMouseEnter={(e) => {
+          if (isDisplayOnly) {
+            return;
+          }
+          const icon = e.currentTarget.querySelector(`.${styles.menuIcon}`);
+          if (icon) {
+            icon.style.backgroundColor = item.hoverBgColor;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (isDisplayOnly) {
+            return;
+          }
+          const icon = e.currentTarget.querySelector(`.${styles.menuIcon}`);
+          if (icon) {
+            icon.style.backgroundColor = item.bgColor;
+          }
+        }}
+      >
+        <div
+          className={styles.menuIcon}
+          style={{
+            color: item.iconColor,
+            backgroundColor: item.bgColor
+          }}
+        >
+          {item.iconSrc ? (
+            typeof item.iconSrc === 'function' ? (
+              <item.iconSrc />
+            ) : (
+              <img src={item.iconSrc} alt={item.title} style={{ width: '1em', height: '1em' }} />
+            )
+          ) : (
+            <Icon type={item.icon} />
+          )}
+        </div>
+        <div className={styles.menuTitle}>{item.title}</div>
+        {!isDisplayOnly && <Icon type="right" className={styles.arrowIcon} />}
+      </div>
+    );
+  };
+
+
+  const filteredLlmRepositoryEntries = getFilteredLlmRepositoryEntries();
+  const llmRepositoryActionMeta = getLlmRepositoryActionMeta();
+
+  return (
+    <>
+      <Modal
+        title={
+          <div className={styles.modalTitle}>
+            {currentView !== 'main' && (
+              <Icon
+                type="arrow-left"
+                className={styles.backIcon}
+                onClick={handleBack}
+              />
+            )}
+            <Icon type="appstore" className={styles.titleIcon} />
+            {getTitle()}
+          </div>
+        }
+        visible={visible}
+        onCancel={handleClose}
+        footer={getModalFooter()}
+        width={
+          (currentView === 'imageRepo' || currentView === 'thirdList')
+            ? 700
+            : 600
+        }
+        className={styles.createComponentModal}
+        bodyStyle={
+          (currentView === 'marketStore' || currentView === 'localMarket')
+              ? { padding: 0 }
+              : {}
+        }
+        style={{ top: 60 }}
+      >
+        {currentView === 'main' ? (
+          <>
+            <div className={styles.subtitle}>
+              {formatMessage({ id: 'componentOverview.body.CreateComponentModal.select_method' })}
+            </div>
+            <div className={styles.groupSectionList}>
+              {mainSections.map(section => (
+                <div key={section.key} className={styles.groupSection}>
+                  <div className={styles.sectionHeader}>
+                    <span className={styles.sectionDesc}>{section.label}</span>
+                  </div>
+                  {section.items.length > 0 ? (
+                    <div className={styles.sectionMenuList}>
+                      {section.items.map(renderMenuItem)}
+                    </div>
+                  ) : (
+                    <div className={styles.sectionEmpty}>
+                      {formatMessage({ id: 'teamAdd.create.null_data' })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : currentView === 'imageRepo' ? (
+          <div>
+            {selectedImageHub && (
+              <ImgRepostory
+                ref={imageRepoFormRef}
+                dispatch={dispatch}
+                currentUser={currentUser}
+                imgSecretId={selectedImageHub.secret_id}
+                showSubmitBtn={true}
+              />
+            )}
+          </div>
+        ) : currentView === 'thirdList' ? (
+          <div className={styles.formWrapper}>
+            {selectedOauthService && (
+              <ThirdList
+                wrappedComponentRef={thirdListFormRef}
+                type={selectedOauthService.service_id}
+                oauthService={selectedOauthService}
+                dispatch={dispatch}
+                currentUser={currentUser}
+                archInfo={archInfo}
+                handleSubmit={handleThirdListSubmit}
+                handleCancel={handleBack}
+              />
+            )}
+          </div>
+        ) : currentView === 'marketStore' ? (
+          <AppMarketContent
+            currentView="list"
+            apps={marketApps}
+            loading={marketLoading}
+            loadingMore={marketLoadingMore}
+            searchValue={marketSearchValue}
+            onSearchChange={(e) => setMarketSearchValue(e.target.value)}
+            onSearch={handleMarketSearch}
+            listRef={marketListRef}
+            onInstall={handleMarketAppInstall}
+            total={marketTotal}
+          />
+        ) : currentView === 'marketInstall' ? (
+          <MarketInstallFormWrapper contentRef={marketInstallFormRef}>
+            <AppMarketContent
+              currentView="install"
+              selectedApp={selectedMarketApp}
+              groups={groups}
+              onChangeVersion={handleMarketVersionChange}
+              installType={marketInstallType}
+              onInstallTypeChange={(e) => setMarketInstallType(e.target.value)}
+              currentVersionInfo={currentMarketVersionInfo}
+              onSubmit={handleMarketAppSubmit}
+              submitLoading={marketSubmitLoading}
+              showSubmitBtn={false}
+            />
+          </MarketInstallFormWrapper>
+        ) : currentView === 'localMarket' ? (
+          <AppMarketContent
+            currentView="list"
+            apps={localMarketApps}
+            loading={localMarketLoading}
+            loadingMore={localMarketLoadingMore}
+            searchValue={localMarketSearchValue}
+            onSearchChange={(e) => setLocalMarketSearchValue(e.target.value)}
+            onSearch={handleLocalMarketSearch}
+            activeTab={localMarketActiveTab}
+            onTabChange={handleLocalMarketTabChange}
+            tabs={[
+              { tab: '全部', key: 'all' },
+              { tab: '公司发布', key: 'enterprise' },
+              { tab: '团队发布', key: 'team' }
+            ]}
+            listRef={localMarketListRef}
+            onInstall={handleLocalAppInstall}
+            showResourceInfo={false}
+            showScopeTag
+            total={localMarketTotal}
+          />
+        ) : currentView === 'localMarketInstall' ? (
+          <LocalInstallFormWrapper contentRef={localInstallFormRef}>
+            <AppMarketContent
+              currentView="install"
+              selectedApp={selectedLocalApp}
+              groups={groups}
+              onChangeVersion={handleLocalVersionChange}
+              installType={localInstallType}
+              onInstallTypeChange={(e) => setLocalInstallType(e.target.value)}
+              currentVersionInfo={currentLocalVersionInfo}
+              showResourceInfo={false}
+              onSubmit={handleLocalAppSubmit}
+              submitLoading={localSubmitLoading}
+              showSubmitBtn={false}
+            />
+          </LocalInstallFormWrapper>
+        ) : currentView === 'plugin' ? (
+          <div className={styles.pluginWrapper}>
+            {pluginLoading ? (
+              <div className={styles.loadingContainer}>
+                <Spin size="large" />
+              </div>
+            ) : pluginError ? (
+              <div className={styles.errorContainer}>
+                <h3>插件加载失败</h3>
+                <p>{pluginErrInfo}</p>
+                <Button onClick={() => importPlugin(selectedPlugin)}>重试</Button>
+              </div>
+            ) : (
+              <RbdPluginsCom
+                app={pluginApp}
+                plugins={selectedPlugin}
+                loading={pluginLoading}
+                pluginLoading={pluginLoading}
+                error={pluginError}
+                errInfo={pluginErrInfo}
+                isCom={true}
+              />
+            )}
+          </div>
+        ) : currentView === 'form' ? (
+          <div className={styles.formWrapper}>
+            {currentFormType === 'docker' && (
+              <ImageNameForm
+                wrappedComponentRef={dockerFormRef}
+                localList={localImageList}
+                data={{ docker_cmd: "" }}
+                onSubmit={handleInstallApp}
+                dispatch={dispatch}
+                archInfo={archInfo}
+                showSubmitBtn={false}
+              />
+            )}
+            {currentFormType === 'docker-compose' && (
+              <ImageComposeForm
+                wrappedComponentRef={dockerComposeFormRef}
+                onSubmit={handleInstallApp}
+                dispatch={dispatch}
+                archInfo={archInfo}
+                showSubmitBtn={false}
+              />
+            )}
+            {currentFormType === 'code-custom' && (
+              <CodeCustomForm
+                wrappedComponentRef={codeCustomFormRef}
+                onSubmit={handleInstallApp}
+                dispatch={dispatch}
+                archInfo={archInfo}
+                enterpriseInfo={enterpriseInfo}
+                showSubmitBtn={false}
+              />
+            )}
+            {currentFormType === 'code-jwar' && (
+              <CodeJwarForm
+                wrappedComponentRef={codeJwarFormRef}
+                onSubmit={handleInstallApp}
+                dispatch={dispatch}
+                archInfo={archInfo}
+                showSubmitBtn={false}
+              />
+            )}
+            {currentFormType === 'yaml' && (
+              <CodeYamlForm
+                wrappedComponentRef={yamlFormRef}
+                onSubmit={handleInstallApp}
+                dispatch={dispatch}
+                showSubmitBtn={false}
+              />
+            )}
+            {currentFormType === 'helm' && (
+              <HelmCmdForm
+                wrappedComponentRef={helmFormRef}
+                onSubmit={handleInstallApp}
+                dispatch={dispatch}
+                onRef={(ref) => setHelmChildRef(ref)}
+                showSubmitBtn={false}
+              />
+            )}
+            {currentFormType === 'third-party' && (
+              <OuterCustomForm
+                wrappedComponentRef={thirdPartyFormRef}
+                onSubmit={handleInstallApp}
+                dispatch={dispatch}
+                showSubmitBtn={false}
+              />
+            )}
+            {currentFormType === 'database' && (
+              <DatabaseCreateForm
+                wrappedComponentRef={databaseFormRef}
+                onSubmit={handleInstallApp}
+                dispatch={dispatch}
+                showSubmitBtn={false}
+                groupId={globalUtil.getAppID()}
+              />
+            )}
+            {currentFormType === 'vm' && (
+              <ImageVirtualMachineForm
+                wrappedComponentRef={vmFormRef}
+                onSubmit={handleInstallApp}
+                dispatch={dispatch}
+                archInfo={archInfo}
+                virtualMachineImage={virtualMachineImages}
+                showSubmitBtn={false}
+              />
+            )}
+          </div>
+        ) : (
+          <>
+            <div className={styles.subtitle}>
+              {formatMessage({ id: 'componentOverview.body.CreateComponentModal.select_deploy_method' })}
+            </div>
+            {(currentView === 'market' && loadingStores) ||
+              (currentView === 'image' && loadingImageHubs) ||
+              (currentView === 'code' && loadingEnterpriseInfo) ||
+              (currentView === 'database' && loadingDatabaseInfo) ? (
+              <div className={styles.loadingWrapper}>
+                <Spin size="large" />
+              </div>
+            ) : (
+              <>
+                <div className={styles.menuList}>
+                  {getCurrentItems().map((item) => (
+                    item.isDivider ? (
+                      <div key={item.key} className={styles.menuDivider}>
+                        <span className={styles.menuDividerText}>{item.dividerText}</span>
+                      </div>
+                    ) : (
+                      renderMenuItem(item)
+                    )
+                  ))}
+                </div>
+                {getAddSectionConfig() && (
+                  <div
+                    className={styles.addPrivateRegistry}
+                    onClick={currentView === 'image' ? handleOpenAddImageRegistry : handleOpenAddOauth}
+                  >
+                    <div className={styles.addIcon}>
+                      <Icon type="plus" />
+                    </div>
+                    <div className={styles.addContent}>
+                      <div className={styles.addTitle}>{getAddSectionConfig().title}</div>
+                      <div className={styles.addDesc}>{getAddSectionConfig().desc}</div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </Modal>
+
+      <Modal
+        title="部署模型"
+        visible={showLlmSelectModal}
+        onCancel={handleCloseLlmSelectModal}
+        onOk={handleConfirmLlmSelection}
+        okText="开始部署"
+        cancelText="取消"
+        confirmLoading={llmSubmitLoading}
+        footer={llmSourceType === 'repository' ? (
+          <div className={styles.llmRepositoryFooter}>
+            <Button onClick={handleCloseLlmSelectModal}>取消</Button>
+            <Button
+              type="primary"
+              disabled={llmRepositoryActionMeta.disabled || llmSubmitLoading}
+              loading={llmSubmitLoading}
+              onClick={handleLlmRepositoryPrimaryAction}
+            >
+              {llmRepositoryActionMeta.label}
+            </Button>
+          </div>
+        ) : undefined}
+        width={520}
+        destroyOnClose
+      >
+        <div className={styles.llmDeployModalBody}>
+          <div className={styles.llmDeployMode}>
+            <span>来源类型</span>
+            <Radio.Group
+              value={llmSourceType}
+              onChange={(event) => {
+                setLlmSourceType(event.target.value);
+                setSelectedLlmRepositoryKey('');
+              }}
+            >
+              <Radio.Button value="repository">模型仓库</Radio.Button>
+              <Radio.Button value="modelscope">魔搭</Radio.Button>
+              <Radio.Button value="upload">上传</Radio.Button>
+            </Radio.Group>
+          </div>
+
+          {llmSourceType === 'repository' ? (
+            <div className={styles.llmRepositoryPanel}>
+              <Input.Search
+                allowClear
+                size="small"
+                placeholder="搜索模型名称、来源或模型 Key"
+                value={llmRepositorySearch}
+                onChange={(event) => {
+                  setLlmRepositorySearch(event.target.value);
+                  setSelectedLlmRepositoryKey('');
+                }}
+              />
+              {llmModelsLoading ? (
+                <div className={styles.llmRepositoryState}>
+                  <Spin />
+                </div>
+              ) : filteredLlmRepositoryEntries.length > 0 ? (
+                <div className={styles.llmRepositoryList}>
+                  {filteredLlmRepositoryEntries.map((entry) => {
+                    const asset = entry.asset;
+                    const model = entry.model || entry.asset || {};
+                    const statusMeta = asset ? getLlmStatusMeta(asset.status) : LLM_STATUS_META.not_downloaded;
+                    const name = model.display_name || model.model_id || model.model_key || '未命名模型';
+                    const parameterScale = getLlmModelParameterScale(model) || model.parameters;
+                    const engineLabel = model.engine_type || model.default_engine || 'vLLM';
+                    const entryKey = getLlmRepositoryEntryKey(entry);
+                    const selected = selectedLlmRepositoryKey === entryKey;
+
+                    return (
+                      <button
+                        key={entryKey}
+                        type="button"
+                        className={`${styles.llmRepositoryItem} ${selected ? styles.llmRepositoryItemSelected : ''}`}
+                        onClick={() => setSelectedLlmRepositoryKey(entryKey)}
+                      >
+                        <span className={styles.llmSelectContent}>
+                          <span className={styles.llmSelectName} title={name}>
+                            {name}
+                          </span>
+                          <span className={styles.llmSelectMeta}>
+                            <span className={`${styles.llmStatusBadge} ${styles[statusMeta.badgeClassName]}`}>
+                              {statusMeta.label}
+                            </span>
+                            {!!parameterScale && <span>{parameterScale}</span>}
+                            <span>{engineLabel}</span>
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className={styles.llmRepositoryState}>
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description={llmModelsError || '当前模型仓库没有匹配模型。'}
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className={styles.llmFormField}>
+                <span>模型名称</span>
+                <Input
+                  placeholder="例如：Qwen2.5-7B-Instruct"
+                  value={llmForm.display_name}
+                  onChange={(event) => handleLlmFormChange('display_name', event.target.value)}
+                />
+              </div>
+
+              <div className={styles.llmFormField}>
+                <span>参数量</span>
+                <Input
+                  placeholder="例如：7B"
+                  value={llmForm.parameters}
+                  onChange={(event) => handleLlmFormChange('parameters', event.target.value)}
+                />
+              </div>
+
+              {llmSourceType === 'upload' ? (
+                <div className={styles.llmFormField}>
+                  <span>模型包文件</span>
+                  <input
+                    className={styles.llmFileInput}
+                    type="file"
+                    accept=".zip,.tar,.tar.gz,.tgz,.tar.bz2,.tar.xz,.bin,.safetensors,.pt,.pth,.onnx,.gguf"
+                    onChange={(event) => {
+                      const nextFile = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+                      setLlmUploadFile(nextFile);
+                    }}
+                  />
+                  <span className={styles.llmFieldHint}>
+                    支持压缩包和常见单文件模型格式，复杂多文件模型建议优先上传打包后的 zip / tar.gz。
+                  </span>
+                </div>
+              ) : (
+                <div className={styles.llmFormField}>
+                  <span>魔搭地址</span>
+                  <Input
+                    placeholder="例如：Qwen/Qwen2.5-7B-Instruct"
+                    value={llmForm.source_uri}
+                    onChange={(event) => handleLlmFormChange('source_uri', event.target.value)}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          <p className={styles.llmDeployHint}>
+            {llmSourceType === 'repository'
+              ? '模型仓库会展示全部模型，已下载模型可直接部署，未下载模型会先进入团队 PVC。'
+              : '魔搭和上传模型会先进入团队 PVC，再作为实例启动来源。'}
+          </p>
+        </div>
+      </Modal>
+
+      {showAddImageRegistry && (
+        <AddOrEditImageRegistry
+          loading={imageHubLoading}
+          imageList={imageHubList}
+          clusters={clusters}
+          onOk={handleAddImageRegistry}
+          onCancel={handleCloseAddImageRegistry}
+        />
+      )}
+
+      {showAddOauth && (
+        <OauthForm
+          title="添加私有Git仓库"
+          type="private"
+          oauthInfo={false}
+          onOk={handleCreatOauth}
+          onCancel={handleCloseAddOauth}
+        />
+      )}
+
+      {/* 插件弹窗 */}
+      {pluginModalVisible && selectedPlugin && (
+        <Modal
+          title={
+            <div className={styles.modalTitle}>
+              <Icon
+                type="arrow-left"
+                className={styles.backIcon}
+                onClick={handlePluginModalClose}
+              />
+              <Icon type="api" className={styles.titleIcon} />
+              {selectedPlugin.display_name || selectedPlugin.alias || selectedPlugin.name || '插件'}
+            </div>
+          }
+          visible={pluginModalVisible}
+          onCancel={handlePluginModalClose}
+          footer={null}
+          width={1200}
+          className={styles.pluginModal}
+          style={{ top: 100 }}
+          bodyStyle={{ padding: 0, height: '80vh', overflow: 'hidden' }}
+        >
+          <div className={styles.pluginContent}>
+            {pluginLoading ? (
+              <div className={styles.loadingContainer}>
+                <Spin size="large" />
+              </div>
+            ) : pluginError ? (
+              <div className={styles.errorContainer}>
+                <h3>插件加载失败</h3>
+                <p>{pluginErrInfo}</p>
+                <Button onClick={() => importPlugin(selectedPlugin)}>重试</Button>
+              </div>
+            ) : (
+              <RbdPluginsCom
+                app={pluginApp}
+                plugins={selectedPlugin}
+                loading={pluginLoading}
+                pluginLoading={pluginLoading}
+                error={pluginError}
+                errInfo={pluginErrInfo}
+                isCom={true}
+              />
+            )}
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+};
+
+export default connect(({ global, teamControl, user, enterprise }) => ({
+  groups: global.groups,
+  pluginsList: teamControl.pluginsList,
+  rainbondInfo: global.rainbondInfo,
+  currentEnterprise: enterprise.currentEnterprise || global.enterprise,
+  currentUser: user.currentUser
+}))(CreateComponentModal);
