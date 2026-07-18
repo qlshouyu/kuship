@@ -1,0 +1,61 @@
+@import "~antd/lib/style/themes/default.less";
+
+.result {
+  text-align: center;
+  width: 100%;
+  margin: 0 auto;
+
+  .icon {
+    font-size: 72px;
+    line-height: 72px;
+    margin-bottom: 24px;
+
+    &>.success {
+      color: @rbd-success-status;
+    }
+
+    &>.warning {
+      color: @rbd-warning-status;
+    }
+
+    &>.error {
+      color: @rbd-error-status;
+    }
+  }
+
+  .title {
+    font-size: 24px;
+    color: @heading-color;
+    font-weight: 500;
+    line-height: 32px;
+    margin-bottom: 16px;
+  }
+
+  .description {
+    font-size: 14px;
+    line-height: 22px;
+    color: @text-color-secondary;
+    margin-bottom: 24px;
+  }
+
+  .cloudDesc {
+    font-size: 20px;
+    color: #00D777;
+  }
+
+  .extra {
+    background: #fafafa;
+    padding: 24px 40px;
+    text-align: left;
+    border-radius: @border-radius-sm;
+    text-align: left;
+  }
+
+  .actions {
+    margin-top: 32px;
+
+    button:not(:last-child) {
+      margin-right: 8px;
+    }
+  }
+}
