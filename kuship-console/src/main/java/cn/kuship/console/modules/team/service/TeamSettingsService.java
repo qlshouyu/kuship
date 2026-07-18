@@ -45,10 +45,16 @@ public class TeamSettingsService {
         this.roleInfoRepository = roleInfoRepository;
     }
 
-    /** 移交管理权（owner-only）：非创建者抛无权；否则 creater→targetUserId。 */
+    /** 移交管理权（owner-only）：非创建者抛无权；目标须为团队成员；否则 creater→targetUserId。 */
     public void transferOwnership(Tenants team, Integer requesterUserId, Integer targetUserId) {
         if (team.getCreater() == null || !team.getCreater().equals(requesterUserId)) {
             throw new NoPermissionsException(); // 对齐 TeamOwnerView owner-only
+        }
+        // 目标须为该团队成员（防止移交给不存在/非成员用户；rainbond 源码缺此校验会落入坏状态，此处加固）
+        boolean isMember = targetUserId != null && permRelTenantRepository.findByTenantId(team.getId())
+                .stream().anyMatch(p -> targetUserId.equals(p.getUserId()));
+        if (!isMember) {
+            throw ServiceHandleException.notFound("user not found", "用户不存在");
         }
         team.setCreater(targetUserId);
         tenantsRepository.save(team);

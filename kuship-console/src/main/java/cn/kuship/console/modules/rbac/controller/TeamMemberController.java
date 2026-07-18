@@ -3,6 +3,7 @@ package cn.kuship.console.modules.rbac.controller;
 import cn.kuship.console.common.context.RequestContext;
 import cn.kuship.console.common.response.ApiResult;
 import cn.kuship.console.common.response.GeneralMessage;
+import cn.kuship.console.common.util.RegionScope;
 import cn.kuship.console.modules.authorization.annotation.PermScope;
 import cn.kuship.console.modules.authorization.annotation.RequiresPerms;
 import cn.kuship.console.modules.rbac.service.TeamMemberRoleService;
@@ -45,8 +46,10 @@ public class TeamMemberController {
     @GetMapping("/console/teams/{team_name}/users")
     @RequiresPerms(kind = PermScope.TEAM, codes = {610001})
     public ApiResult listUsers(@PathVariable("team_name") String teamName,
+                               @RequestParam(value = "region_name", required = false) String regionName,
                                @RequestParam(value = "page", defaultValue = "1") int page,
                                @RequestParam(value = "query", required = false) String query) {
+        RegionScope.require(regionName);
         Map<String, Object> r = memberService.listUsers(team(teamName), requestContext.getCurrentUser(), query, page);
         @SuppressWarnings("unchecked")
         List<?> list = (List<?>) r.get("list");
@@ -56,7 +59,9 @@ public class TeamMemberController {
 
     @GetMapping("/console/teams/{team_name}/users/roles")
     @RequiresPerms(kind = PermScope.TEAM, codes = {610001})
-    public ApiResult usersRoles(@PathVariable("team_name") String teamName) {
+    public ApiResult usersRoles(@PathVariable("team_name") String teamName,
+                                @RequestParam(value = "region_name", required = false) String regionName) {
+        RegionScope.require(regionName);
         return GeneralMessage.list(200, "success", null, memberService.getUsersRoles(team(teamName)));
     }
 
@@ -82,7 +87,9 @@ public class TeamMemberController {
 
     @GetMapping("/console/teams/{team_name}/users/{user_id}/perms")
     @RequiresPerms(kind = PermScope.TEAM, codes = {610001})
-    public ApiResult getUserPerms(@PathVariable("team_name") String teamName, @PathVariable("user_id") Integer userId) {
+    public ApiResult getUserPerms(@PathVariable("team_name") String teamName, @PathVariable("user_id") Integer userId,
+                                  @RequestParam(value = "region_name", required = false) String regionName) {
+        RegionScope.require(regionName);
         Map<String, Object> bean = memberService.getUserPerms(team(teamName), userId, requestContext.getCurrentUser());
         return GeneralMessage.bean(200, "success", null, bean);
     }
@@ -90,9 +97,11 @@ public class TeamMemberController {
     @GetMapping("/console/teams/{team_name}/notjoinusers")
     @RequiresPerms(kind = PermScope.TEAM, codes = {610001})
     public ApiResult notJoinUsers(@PathVariable("team_name") String teamName,
+                                  @RequestParam(value = "region_name", required = false) String regionName,
                                   @RequestParam(value = "page", defaultValue = "1") int page,
                                   @RequestParam(value = "page_size", defaultValue = "10") int pageSize,
                                   @RequestParam(value = "query", required = false) String query) {
+        RegionScope.require(regionName);
         String eid = requestContext.getCurrentUser().getEnterpriseId();
         Map<String, Object> r = memberService.listNotJoinUsers(team(teamName), eid, query, page, pageSize);
         ApiResult res = GeneralMessage.list(200, null, null, (List<?>) r.get("list"));
@@ -104,7 +113,10 @@ public class TeamMemberController {
 
     @DeleteMapping("/console/teams/{team_name}/users/batch/delete")
     @RequiresPerms(kind = PermScope.TEAM, codes = {610004})
-    public ApiResult batchDelete(@PathVariable("team_name") String teamName, @RequestBody Map<String, Object> body) {
+    public ApiResult batchDelete(@PathVariable("team_name") String teamName,
+                                 @RequestParam(value = "region_name", required = false) String regionName,
+                                 @RequestBody Map<String, Object> body) {
+        RegionScope.require(regionName);
         List<Integer> userIds = parseUserIds(body);
         memberService.batchRemoveMembers(team(teamName), requestContext.getCurrentUser().getUserId(), userIds);
         return GeneralMessage.message(200, "delete the success", "删除成功");
