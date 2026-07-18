@@ -2,6 +2,7 @@ package cn.kuship.console.modules.rbac.controller;
 
 import cn.kuship.console.common.response.ApiResult;
 import cn.kuship.console.common.response.GeneralMessage;
+import cn.kuship.console.common.util.RegionScope;
 import cn.kuship.console.modules.authorization.annotation.PermScope;
 import cn.kuship.console.modules.authorization.annotation.RequiresPerms;
 import cn.kuship.console.modules.rbac.service.TeamRoleWriteService;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -21,7 +23,7 @@ import java.util.Map;
 /**
  * 团队角色管理写（对齐 rainbond perms.py 的 TeamRoles*View）。
  * 受 TEAM_ROLE_PERMS 鉴权：get=630001 / post=630002 / put=630003 / delete=630004（P1-c 拦截器据 @RequiresPerms 校验）。
- * RUD/perms 接口 7070 继承 RegionTenantHeaderView 需 region_name；角色功能不依赖 region，kuship 接收即忽略。
+ * RUD/perms 接口 7070 继承 RegionTenantHeaderView 需 region_name：缺失返「请求参数不全」(RegionScope.require)；角色功能本身不依赖 region。
  */
 @RestController
 public class TeamRoleController {
@@ -57,14 +59,18 @@ public class TeamRoleController {
 
     @GetMapping("/console/teams/{team_name}/roles/{role_id}")
     @RequiresPerms(kind = PermScope.TEAM, codes = {630001})
-    public ApiResult getRole(@PathVariable("team_name") String teamName, @PathVariable("role_id") Integer roleId) {
+    public ApiResult getRole(@PathVariable("team_name") String teamName, @PathVariable("role_id") Integer roleId,
+                             @RequestParam(value = "region_name", required = false) String regionName) {
+        RegionScope.require(regionName);
         return GeneralMessage.bean(200, "success", null, roleService.getRole(tenantId(teamName), roleId));
     }
 
     @PutMapping("/console/teams/{team_name}/roles/{role_id}")
     @RequiresPerms(kind = PermScope.TEAM, codes = {630003})
     public ApiResult updateRole(@PathVariable("team_name") String teamName, @PathVariable("role_id") Integer roleId,
+                                @RequestParam(value = "region_name", required = false) String regionName,
                                 @RequestBody Map<String, Object> body) {
+        RegionScope.require(regionName);
         String name = body == null ? null : (String) body.get("name");
         Map<String, Object> bean = roleService.updateRole(tenantId(teamName), roleId, name);
         return GeneralMessage.bean(200, "success", "更新角色成功", bean);
@@ -72,7 +78,9 @@ public class TeamRoleController {
 
     @DeleteMapping("/console/teams/{team_name}/roles/{role_id}")
     @RequiresPerms(kind = PermScope.TEAM, codes = {630004})
-    public ApiResult deleteRole(@PathVariable("team_name") String teamName, @PathVariable("role_id") Integer roleId) {
+    public ApiResult deleteRole(@PathVariable("team_name") String teamName, @PathVariable("role_id") Integer roleId,
+                                @RequestParam(value = "region_name", required = false) String regionName) {
+        RegionScope.require(regionName);
         roleService.deleteRole(tenantId(teamName), roleId);
         return GeneralMessage.message(200, "success", "删除角色成功");
     }
@@ -81,14 +89,18 @@ public class TeamRoleController {
 
     @GetMapping("/console/teams/{team_name}/roles/perms")
     @RequiresPerms(kind = PermScope.TEAM, codes = {630001})
-    public ApiResult listRolesPerms(@PathVariable("team_name") String teamName) {
+    public ApiResult listRolesPerms(@PathVariable("team_name") String teamName,
+                                    @RequestParam(value = "region_name", required = false) String regionName) {
+        RegionScope.require(regionName);
         List<Map<String, Object>> list = roleService.listRolesPerms(tenantId(teamName));
         return GeneralMessage.list(200, "success", null, list);
     }
 
     @GetMapping("/console/teams/{team_name}/roles/{role_id}/perms")
     @RequiresPerms(kind = PermScope.TEAM, codes = {630001})
-    public ApiResult getRolePerms(@PathVariable("team_name") String teamName, @PathVariable("role_id") Integer roleId) {
+    public ApiResult getRolePerms(@PathVariable("team_name") String teamName, @PathVariable("role_id") Integer roleId,
+                                  @RequestParam(value = "region_name", required = false) String regionName) {
+        RegionScope.require(regionName);
         return GeneralMessage.bean(200, "success", null, roleService.getRolePerms(tenantId(teamName), roleId));
     }
 
@@ -96,7 +108,9 @@ public class TeamRoleController {
     @RequiresPerms(kind = PermScope.TEAM, codes = {630003})
     @SuppressWarnings("unchecked")
     public ApiResult updateRolePerms(@PathVariable("team_name") String teamName, @PathVariable("role_id") Integer roleId,
+                                     @RequestParam(value = "region_name", required = false) String regionName,
                                      @RequestBody Map<String, Object> body) {
+        RegionScope.require(regionName);
         Map<String, Object> permsTree = body == null ? Map.of() : (Map<String, Object>) body.get("permissions");
         Map<String, Object> bean = roleService.updateRolePerms(tenantId(teamName), roleId, permsTree);
         return GeneralMessage.bean(200, "success", null, bean);

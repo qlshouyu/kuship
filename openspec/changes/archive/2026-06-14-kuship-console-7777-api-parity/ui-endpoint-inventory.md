@@ -1,0 +1,603 @@
+# UI 接口全量清单 (kuship-ui → kuship-console)
+
+> 自动抽取自 `kuship-ui/src/services/*.js`。UI 调用去重 **561** 个；已实现可立即 deep-diff **55**；未实现(404, 后续 feature) **506**。
+
+
+## A. 已实现 — 本次逐个对齐范围 (55个)
+
+
+### 00 Bootstrap
+- [x] `/console/config/info`
+- [x] `/console/perms`
+
+### 01 用户/鉴权
+- [x] `/console/users/access-token`
+- [x] `/console/users/access-token/{}`
+- [x] `/console/users/changepwd`
+- [x] `/console/users/custom_configs`
+- [x] `/console/users/details`
+- [x] `/console/users/login`
+- [x] `/console/users/logout`
+
+### 02 企业
+- [x] `/console/enterprise/{}/admin/roles`
+- [x] `/console/enterprise/{}/info`
+- [x] `/console/enterprise/{}/overview`
+- [x] `/console/enterprise/{}/overview/team`
+- [x] `/console/enterprise/{}/teams`
+- [x] `/console/enterprise/{}/user/{}/teams`
+- [x] `/console/enterprise/{}/users`
+- [x] `/console/enterprises`
+
+### 03 集群
+- [x] `/console/enterprise/{}/regions`
+- [x] `/console/enterprise/{}/regions/{}`
+- [x] `/console/enterprise/{}/regions/{}/cnb/frameworks`
+- [x] `/console/enterprise/{}/regions/{}/convert-resource`
+- [x] `/console/enterprise/{}/regions/{}/namespace`
+- [x] `/console/enterprise/{}/regions/{}/resource`
+
+### 04 团队/成员/角色
+- [x] `/console/teams/add-teams`
+- [x] `/console/teams/{}/delete`
+- [x] `/console/teams/{}/exit`
+- [x] `/console/teams/{}/modifyname`
+- [x] `/console/teams/{}/notjoinusers`
+- [x] `/console/teams/{}/overview`
+- [x] `/console/teams/{}/pemtransfer`
+- [x] `/console/teams/{}/roles`
+- [x] `/console/teams/{}/roles/{}`
+- [x] `/console/teams/{}/roles/{}/perms`
+- [x] `/console/teams/{}/users`
+- [x] `/console/teams/{}/users/batch/delete`
+- [x] `/console/teams/{}/users/roles`
+- [x] `/console/teams/{}/users/{}/perms`
+- [x] `/console/teams/{}/users/{}/roles`
+
+### 05 应用(group)
+- [x] `/console/teams/{}/groups`
+
+### 06 组件
+- [x] `/console/teams/{}/apps/{}/brief`
+- [x] `/console/teams/{}/apps/{}/dependency`
+- [x] `/console/teams/{}/apps/{}/dependency-list`
+- [x] `/console/teams/{}/apps/{}/dependency-reverse`
+- [x] `/console/teams/{}/apps/{}/detail`
+- [x] `/console/teams/{}/apps/{}/envs`
+- [x] `/console/teams/{}/apps/{}/graphs`
+- [x] `/console/teams/{}/apps/{}/labels`
+- [x] `/console/teams/{}/apps/{}/pods`
+- [x] `/console/teams/{}/apps/{}/ports`
+- [x] `/console/teams/{}/apps/{}/probe`
+- [x] `/console/teams/{}/apps/{}/status`
+- [x] `/console/teams/{}/apps/{}/un_dependency`
+- [x] `/console/teams/{}/apps/{}/volumes`
+- [x] `/console/teams/{}/apps/{}/xparules`
+- [x] `/console/teams/{}/components/{}/k8s-attributes`
+
+## B. UI 调用但未实现 (404, 后续 feature backlog — 不在本次对齐) (506个)
+
+
+### 00 Bootstrap (1)
+- `/console/config/oss`
+
+### 01 用户/鉴权 (9)
+- `/console/users/begin_password_reset`
+- `/console/users/invite`
+- `/console/users/invite/{}`
+- `/console/users/login-by-phone`
+- `/console/users/register`
+- `/console/users/register-by-phone`
+- `/console/users/send_reset_email`
+- `/console/users/team_details`
+- `/console/users/teams/query`
+
+### 02 企业 (8)
+- `/console/enterprise/{}/admin/user`
+- `/console/enterprise/{}/admin/user/{}`
+- `/console/enterprise/{}/overview/app`
+- `/console/enterprise/{}/user/favorite`
+- `/console/enterprise/{}/user/favorite/{}`
+- `/console/enterprise/{}/user/{}`
+- `/console/enterprise/{}/users/{}/teams/{}/roles`
+- `/console/enterprises/{}/sms-config`
+
+### 03 集群 (23)
+- `/console/enterprise/regions/{}/purchase`
+- `/console/enterprise/regions/{}/res-price`
+- `/console/enterprise/{}/platform/regions/{}`
+- `/console/enterprise/{}/regions/{}/abilities`
+- `/console/enterprise/{}/regions/{}/abilities/{}`
+- `/console/enterprise/{}/regions/{}/batch-gateway`
+- `/console/enterprise/{}/regions/{}/gateway`
+- `/console/enterprise/{}/regions/{}/lang_version`
+- `/console/enterprise/{}/regions/{}/mavensettings`
+- `/console/enterprise/{}/regions/{}/mavensettings/{}`
+- `/console/enterprise/{}/regions/{}/nodes`
+- `/console/enterprise/{}/regions/{}/nodes/{}`
+- `/console/enterprise/{}/regions/{}/nodes/{}/action`
+- `/console/enterprise/{}/regions/{}/nodes/{}/container`
+- `/console/enterprise/{}/regions/{}/nodes/{}/labels`
+- `/console/enterprise/{}/regions/{}/nodes/{}/taints`
+- `/console/enterprise/{}/regions/{}/officialplugins`
+- `/console/enterprise/{}/regions/{}/platform-plugins`
+- `/console/enterprise/{}/regions/{}/platform-plugins/{}/install`
+- `/console/enterprise/{}/regions/{}/plugins`
+- `/console/enterprise/{}/regions/{}/rbd-components`
+- `/console/enterprise/{}/regions/{}/tenants`
+- `/console/enterprise/{}/regions/{}/tenants/{}/limit`
+
+### 04 团队/成员/角色 (133)
+- `/console/teams/cluster/namespaces`
+- `/console/teams/init`
+- `/console/teams/three_service/operate_options`
+- `/console/teams/user/identity`
+- `/console/teams/{team_name}/roles`
+- `/console/teams/{team_name}/roles/{role_id}`
+- `/console/teams/{}/access-token/{}`
+- `/console/teams/{}/add_team_user`
+- `/console/teams/{}/again_delete`
+- `/console/teams/{}/all/groupapp/backup`
+- `/console/teams/{}/app_names`
+- `/console/teams/{}/applicants`
+- `/console/teams/{}/apps`
+- `/console/teams/{}/apps/all_apps`
+- `/console/teams/{}/apps/close`
+- `/console/teams/{}/apps/cmd_create`
+- `/console/teams/{}/apps/docker_compose`
+- `/console/teams/{}/apps/docker_run`
+- `/console/teams/{}/apps/image_repositories`
+- `/console/teams/{}/apps/image_tags`
+- `/console/teams/{}/apps/import/dir`
+- `/console/teams/{}/apps/import/importing-apps`
+- `/console/teams/{}/apps/kubeblocks`
+- `/console/teams/{}/apps/market_create`
+- `/console/teams/{}/apps/package_build`
+- `/console/teams/{}/apps/package_build/last-record`
+- `/console/teams/{}/apps/package_build/record`
+- `/console/teams/{}/apps/package_build/tar-image/load`
+- `/console/teams/{}/apps/package_build/tar-image/load/{}`
+- `/console/teams/{}/apps/plugins`
+- `/console/teams/{}/apps/source_code`
+- `/console/teams/{}/apps/third_party`
+- `/console/teams/{}/apps/vm_run`
+- `/console/teams/{}/arch`
+- `/console/teams/{}/batch-gateway-http-route`
+- `/console/teams/{}/batch_actions`
+- `/console/teams/{}/batch_delete`
+- `/console/teams/{}/certificates`
+- `/console/teams/{}/certificates/{}`
+- `/console/teams/{}/chart/version`
+- `/console/teams/{}/check-resource-name`
+- `/console/teams/{}/checkK8sServiceName`
+- `/console/teams/{}/check_upload_chart`
+- `/console/teams/{}/code_repo/branchs`
+- `/console/teams/{}/code_repo/github`
+- `/console/teams/{}/code_repo/gitlab`
+- `/console/teams/{}/compose/{}/content`
+- `/console/teams/{}/compose/{}/services`
+- `/console/teams/{}/detail`
+- `/console/teams/{}/domain/get_port`
+- `/console/teams/{}/domain/query`
+- `/console/teams/{}/domain/{}/put_gateway`
+- `/console/teams/{}/events`
+- `/console/teams/{}/events/{}/log`
+- `/console/teams/{}/gateway-http-route`
+- `/console/teams/{}/get_upload_chart_information`
+- `/console/teams/{}/get_upload_chart_resource`
+- `/console/teams/{}/get_upload_chart_value`
+- `/console/teams/{}/group/service/visit`
+- `/console/teams/{}/group/{}/resources`
+- `/console/teams/{}/groupapp/backup`
+- `/console/teams/{}/groupapp/{}/backup`
+- `/console/teams/{}/groupapp/{}/copy`
+- `/console/teams/{}/groupapp/{}/delete`
+- `/console/teams/{}/groupapp/{}/migrate`
+- `/console/teams/{}/groupapp/{}/migrate/record`
+- `/console/teams/{}/helm_app`
+- `/console/teams/{}/helm_center_app`
+- `/console/teams/{}/helm_cmd_add`
+- `/console/teams/{}/helm_command`
+- `/console/teams/{}/helm_list`
+- `/console/teams/{}/http-limiting-policy`
+- `/console/teams/{}/httpdomain`
+- `/console/teams/{}/import_upload_chart_resource`
+- `/console/teams/{}/message`
+- `/console/teams/{}/multi/check`
+- `/console/teams/{}/operator-managed`
+- `/console/teams/{}/overview/service/over`
+- `/console/teams/{}/plugin-share/{}`
+- `/console/teams/{}/plugin-share/{}/complete`
+- `/console/teams/{}/plugin-share/{}/events`
+- `/console/teams/{}/plugin-share/{}/events/{}`
+- `/console/teams/{}/plugins`
+- `/console/teams/{}/plugins/all`
+- `/console/teams/{}/plugins/default`
+- `/console/teams/{}/plugins/{}`
+- `/console/teams/{}/plugins/{}/build-history`
+- `/console/teams/{}/plugins/{}/new-version`
+- `/console/teams/{}/plugins/{}/share/record`
+- `/console/teams/{}/plugins/{}/used_services`
+- `/console/teams/{}/plugins/{}/version/{}`
+- `/console/teams/{}/plugins/{}/version/{}/build`
+- `/console/teams/{}/plugins/{}/version/{}/config`
+- `/console/teams/{}/plugins/{}/version/{}/event-log`
+- `/console/teams/{}/plugins/{}/version/{}/status`
+- `/console/teams/{}/protocols`
+- `/console/teams/{}/region`
+- `/console/teams/{}/region/query`
+- `/console/teams/{}/region/unopen`
+- `/console/teams/{}/regions/{}`
+- `/console/teams/{}/regions/{}/apps_port`
+- `/console/teams/{}/regions/{}/components`
+- `/console/teams/{}/regions/{}/features`
+- `/console/teams/{}/regions/{}/kubeblocks/backup_repos`
+- `/console/teams/{}/regions/{}/kubeblocks/storage_classes`
+- `/console/teams/{}/regions/{}/kubeblocks/supported_databases`
+- `/console/teams/{}/regions/{}/publickey`
+- `/console/teams/{}/regions/{}/query_range/query`
+- `/console/teams/{}/regions/{}/resource-center/pods/{}/logs{}`
+- `/console/teams/{}/regions/{}/sort_domain/query`
+- `/console/teams/{}/regions/{}/sort_service/query`
+- `/console/teams/{}/regions/{}/topological`
+- `/console/teams/{}/registry/auth`
+- `/console/teams/{}/registry/auth/{}`
+- `/console/teams/{}/resource-detailed`
+- `/console/teams/{}/resource-name`
+- `/console/teams/{}/service`
+- `/console/teams/{}/service/group`
+- `/console/teams/{}/services/envs`
+- `/console/teams/{}/services/event`
+- `/console/teams/{}/share/{}/complete`
+- `/console/teams/{}/share/{}/events`
+- `/console/teams/{}/share/{}/events/{}`
+- `/console/teams/{}/share/{}/events/{}/plugin`
+- `/console/teams/{}/share/{}/giveup`
+- `/console/teams/{}/share/{}/info`
+- `/console/teams/{}/size`
+- `/console/teams/{}/tcpdomain`
+- `/console/teams/{}/tcpdomain/query`
+- `/console/teams/{}/vm/assets`
+- `/console/teams/{}/vm/capabilities`
+- `/console/teams/{}/{}/details`
+- `/console/teams/{}/{}/overview/services/status`
+
+### 05 应用(group) (52)
+- `/console/teams/{}/groups/{}`
+- `/console/teams/{}/groups/{}/app-version-rollback-records`
+- `/console/teams/{}/groups/{}/app-version-rollback-records/{}`
+- `/console/teams/{}/groups/{}/app-versions`
+- `/console/teams/{}/groups/{}/app-versions/overview`
+- `/console/teams/{}/groups/{}/app-versions/{}`
+- `/console/teams/{}/groups/{}/app-versions/{}/rollback`
+- `/console/teams/{}/groups/{}/apps`
+- `/console/teams/{}/groups/{}/apps/{}`
+- `/console/teams/{}/groups/{}/batch-components`
+- `/console/teams/{}/groups/{}/check`
+- `/console/teams/{}/groups/{}/common_operation`
+- `/console/teams/{}/groups/{}/component_names`
+- `/console/teams/{}/groups/{}/components`
+- `/console/teams/{}/groups/{}/compose_build`
+- `/console/teams/{}/groups/{}/compose_update`
+- `/console/teams/{}/groups/{}/configgroups`
+- `/console/teams/{}/groups/{}/configgroups/{}`
+- `/console/teams/{}/groups/{}/delete`
+- `/console/teams/{}/groups/{}/detect-process`
+- `/console/teams/{}/groups/{}/get_check_uuid`
+- `/console/teams/{}/groups/{}/governancemode`
+- `/console/teams/{}/groups/{}/governancemode-cr`
+- `/console/teams/{}/groups/{}/governancemode/check`
+- `/console/teams/{}/groups/{}/handle`
+- `/console/teams/{}/groups/{}/helmapp-components`
+- `/console/teams/{}/groups/{}/install`
+- `/console/teams/{}/groups/{}/k8s-resources`
+- `/console/teams/{}/groups/{}/k8s-resources/{}`
+- `/console/teams/{}/groups/{}/k8sservices`
+- `/console/teams/{}/groups/{}/last-upgrade-record`
+- `/console/teams/{}/groups/{}/monitor/batch_query`
+- `/console/teams/{}/groups/{}/parse-helm-app`
+- `/console/teams/{}/groups/{}/pods/{}`
+- `/console/teams/{}/groups/{}/releases`
+- `/console/teams/{}/groups/{}/services`
+- `/console/teams/{}/groups/{}/share/record`
+- `/console/teams/{}/groups/{}/share/record/{}`
+- `/console/teams/{}/groups/{}/shared/apps`
+- `/console/teams/{}/groups/{}/status`
+- `/console/teams/{}/groups/{}/upgradable_num`
+- `/console/teams/{}/groups/{}/upgrade-info`
+- `/console/teams/{}/groups/{}/upgrade-records`
+- `/console/teams/{}/groups/{}/upgrade-records/{}`
+- `/console/teams/{}/groups/{}/upgrade-records/{}/deploy`
+- `/console/teams/{}/groups/{}/upgrade-records/{}/rollback`
+- `/console/teams/{}/groups/{}/upgrade-records/{}/rollback-records`
+- `/console/teams/{}/groups/{}/upgrade-records/{}/upgrade`
+- `/console/teams/{}/groups/{}/upgrade-versions`
+- `/console/teams/{}/groups/{}/visit`
+- `/console/teams/{}/groups/{}/volumes`
+- `/console/teams/{}/overview/groups`
+
+### 06 组件 (92)
+- `/api/v1/apps/{}/install`
+- `/console/regions/{}/backend/plugins/{}/api/v1/components/{}`
+- `/console/regions/{}/backend/plugins/{}/api/v1/components/{}/status`
+- `/console/teams/{}/apps/{}/3rd-party/health`
+- `/console/teams/{}/apps/{}/analyze_plugins`
+- `/console/teams/{}/apps/{}/build`
+- `/console/teams/{}/apps/{}/build_envs`
+- `/console/teams/{}/apps/{}/buildsource`
+- `/console/teams/{}/apps/{}/change/service_name`
+- `/console/teams/{}/apps/{}/check`
+- `/console/teams/{}/apps/{}/check_update`
+- `/console/teams/{}/apps/{}/code/branch`
+- `/console/teams/{}/apps/{}/compile_env`
+- `/console/teams/{}/apps/{}/delete`
+- `/console/teams/{}/apps/{}/dependency/{}`
+- `/console/teams/{}/apps/{}/deploy`
+- `/console/teams/{}/apps/{}/deploytype`
+- `/console/teams/{}/apps/{}/domain`
+- `/console/teams/{}/apps/{}/envs/{}`
+- `/console/teams/{}/apps/{}/event_log`
+- `/console/teams/{}/apps/{}/events`
+- `/console/teams/{}/apps/{}/exchange-graphs`
+- `/console/teams/{}/apps/{}/extend_method`
+- `/console/teams/{}/apps/{}/file-manage`
+- `/console/teams/{}/apps/{}/file-manage/block`
+- `/console/teams/{}/apps/{}/get_check_uuid`
+- `/console/teams/{}/apps/{}/graphs/{}`
+- `/console/teams/{}/apps/{}/group`
+- `/console/teams/{}/apps/{}/history_log`
+- `/console/teams/{}/apps/{}/horizontal`
+- `/console/teams/{}/apps/{}/internal-graphs`
+- `/console/teams/{}/apps/{}/job_strategy`
+- `/console/teams/{}/apps/{}/keyword`
+- `/console/teams/{}/apps/{}/kubeblocks/backup-config`
+- `/console/teams/{}/apps/{}/kubeblocks/backups`
+- `/console/teams/{}/apps/{}/kubeblocks/detail`
+- `/console/teams/{}/apps/{}/kubeblocks/parameters`
+- `/console/teams/{}/apps/{}/kubeblocks/restores`
+- `/console/teams/{}/apps/{}/labels/available`
+- `/console/teams/{}/apps/{}/lang-update`
+- `/console/teams/{}/apps/{}/lang_version`
+- `/console/teams/{}/apps/{}/log`
+- `/console/teams/{}/apps/{}/log_instance`
+- `/console/teams/{}/apps/{}/logs`
+- `/console/teams/{}/apps/{}/market_service/upgrade`
+- `/console/teams/{}/apps/{}/metrics`
+- `/console/teams/{}/apps/{}/mnt`
+- `/console/teams/{}/apps/{}/mnt/{}`
+- `/console/teams/{}/apps/{}/monitor/query`
+- `/console/teams/{}/apps/{}/monitor/query_range`
+- `/console/teams/{}/apps/{}/multi/create`
+- `/console/teams/{}/apps/{}/package_tool`
+- `/console/teams/{}/apps/{}/perms`
+- `/console/teams/{}/apps/{}/pluginlist`
+- `/console/teams/{}/apps/{}/plugins/{}/configs`
+- `/console/teams/{}/apps/{}/plugins/{}/install`
+- `/console/teams/{}/apps/{}/plugins/{}/open`
+- `/console/teams/{}/apps/{}/pods/{}/detail`
+- `/console/teams/{}/apps/{}/ports/{}`
+- `/console/teams/{}/apps/{}/resource`
+- `/console/teams/{}/apps/{}/restart`
+- `/console/teams/{}/apps/{}/rollback`
+- `/console/teams/{}/apps/{}/scaling`
+- `/console/teams/{}/apps/{}/service_monitor`
+- `/console/teams/{}/apps/{}/service_monitor/{}`
+- `/console/teams/{}/apps/{}/set/is_upgrade`
+- `/console/teams/{}/apps/{}/sld-domain`
+- `/console/teams/{}/apps/{}/start`
+- `/console/teams/{}/apps/{}/stop`
+- `/console/teams/{}/apps/{}/tar_image`
+- `/console/teams/{}/apps/{}/tcp-ports/{}`
+- `/console/teams/{}/apps/{}/third_party/pods`
+- `/console/teams/{}/apps/{}/third_party/updatekey`
+- `/console/teams/{}/apps/{}/topological/ports`
+- `/console/teams/{}/apps/{}/trace`
+- `/console/teams/{}/apps/{}/upgrade`
+- `/console/teams/{}/apps/{}/version`
+- `/console/teams/{}/apps/{}/version/{}`
+- `/console/teams/{}/apps/{}/vertical`
+- `/console/teams/{}/apps/{}/visit`
+- `/console/teams/{}/apps/{}/vm-disks`
+- `/console/teams/{}/apps/{}/volume-opts`
+- `/console/teams/{}/apps/{}/volumes/{}`
+- `/console/teams/{}/apps/{}/webhooks/get-url`
+- `/console/teams/{}/apps/{}/webhooks/status`
+- `/console/teams/{}/apps/{}/webhooks/trigger`
+- `/console/teams/{}/apps/{}/webhooks/updatekey`
+- `/console/teams/{}/apps/{}/xparecords`
+- `/console/teams/{}/apps/{}/xparules/{}`
+- `/console/teams/{}/apps/{}/{}`
+- `/console/teams/{}/components/{}/k8s-attributes/{}`
+- `/console/teams/{}/groups/{}/apps/{}/components`
+
+### 09 企业其它 (67)
+- `/console/enterprise/account`
+- `/console/enterprise/admin/join-team`
+- `/console/enterprise/diy_envs`
+- `/console/enterprise/goodrain_log`
+- `/console/enterprise/helm/region_status`
+- `/console/enterprise/helm/token`
+- `/console/enterprise/init`
+- `/console/enterprise/monitor_alarm`
+- `/console/enterprise/region/resource`
+- `/console/enterprise/region_name/{}/rbd-component-logs`
+- `/console/enterprise/region_name/{}/rbd-log-files`
+- `/console/enterprise/region_name/{}/rbd-logs`
+- `/console/enterprise/region_name/{}/rbd-pods`
+- `/console/enterprise/registerstatus`
+- `/console/enterprise/shell-pod`
+- `/console/enterprise/team/{}/all-region-fee`
+- `/console/enterprise/team/{}/fee`
+- `/console/enterprise/team/{}/recharge-records`
+- `/console/enterprise/{}/active/optimiz`
+- `/console/enterprise/{}/agent-llm-config`
+- `/console/enterprise/{}/alerts`
+- `/console/enterprise/{}/app-model/{}`
+- `/console/enterprise/{}/app-model/{}/version/{}`
+- `/console/enterprise/{}/app-models`
+- `/console/enterprise/{}/app-models/export`
+- `/console/enterprise/{}/app-models/import`
+- `/console/enterprise/{}/app-models/import/{}`
+- `/console/enterprise/{}/app-models/import/{}/dir`
+- `/console/enterprise/{}/app-models/tag`
+- `/console/enterprise/{}/app-models/tag/{}`
+- `/console/enterprise/{}/app-models/{}/tag`
+- `/console/enterprise/{}/apps`
+- `/console/enterprise/{}/apps/{}/components`
+- `/console/enterprise/{}/appstoreimagehub`
+- `/console/enterprise/{}/backups`
+- `/console/enterprise/{}/base-guidance`
+- `/console/enterprise/{}/cloud/app-models`
+- `/console/enterprise/{}/cloud/app-models/download`
+- `/console/enterprise/{}/cloud/app-models/recommend`
+- `/console/enterprise/{}/cloud/bind-markets`
+- `/console/enterprise/{}/cloud/bindable-markets`
+- `/console/enterprise/{}/cloud/markets`
+- `/console/enterprise/{}/cloud/markets/{}`
+- `/console/enterprise/{}/cloud/markets/{}/app-models`
+- `/console/enterprise/{}/cloud/markets/{}/organizations`
+- `/console/enterprise/{}/configs`
+- `/console/enterprise/{}/create-app-teams`
+- `/console/enterprise/{}/jointeams`
+- `/console/enterprise/{}/licenses`
+- `/console/enterprise/{}/login-events`
+- `/console/enterprise/{}/monitor`
+- `/console/enterprise/{}/my_events`
+- `/console/enterprise/{}/myteams`
+- `/console/enterprise/{}/oauth/oauth-services`
+- `/console/enterprise/{}/objectstorage`
+- `/console/enterprise/{}/operation-logs`
+- `/console/enterprise/{}/orders`
+- `/console/enterprise/{}/orders/{}`
+- `/console/enterprise/{}/platform-settings`
+- `/console/enterprise/{}/platform-settings/update`
+- `/console/enterprise/{}/recover`
+- `/console/enterprise/{}/service_alarm`
+- `/console/enterprise/{}/storehub-check`
+- `/console/enterprise/{}/subscribe`
+- `/console/enterprise/{}/team/{}/app/{}/domain`
+- `/console/enterprise/{}/team/{}/app/{}/tcpdomain`
+- `/console/enterprise/{}/team_names`
+
+### 99 其它 (121)
+- `/api/fake_list`
+- `/api/rule`
+- `/api/v1/ai-engine/models`
+- `/api/v1/ai-engine/team/models`
+- `/api/v1/ai-engine/team/models/downloads`
+- `/api/v1/ai-engine/team/uploads`
+- `/api/v1/pricing`
+- `/api/v1/tags`
+- `/api/v1/user/account/financial`
+- `/api/v1/user/sync/data`
+- `/console/agent/access`
+- `/console/api-gateway/v1/{}/cert/{}`
+- `/console/api-gateway/v1/{}/routes/http/cert-manager`
+- `/console/api-gateway/v1/{}/routes/http/cert-manager/check`
+- `/console/api-gateway/v1/{}/routes/{}`
+- `/console/api-gateway/v1/{}/routes/{}/{}`
+- `/console/api-gateway/v1/{}/service`
+- `/console/api-gateway/v1/{}/service/{}`
+- `/console/app_market/all`
+- `/console/app_market/version`
+- `/console/apps`
+- `/console/apps/source_code`
+- `/console/bank/info`
+- `/console/checksource`
+- `/console/cluster`
+- `/console/cluster_install`
+- `/console/cluster_node`
+- `/console/cluster_node_ip`
+- `/console/cluster_uninstall`
+- `/console/custom_configs`
+- `/console/errlog`
+- `/console/github/callback`
+- `/console/gitlab/register`
+- `/console/helm/repos`
+- `/console/hub/registry`
+- `/console/hub/registry/image`
+- `/console/market/plugins`
+- `/console/market/plugins/install`
+- `/console/market/plugins/sync`
+- `/console/market/plugins/sync-template`
+- `/console/market/plugins/uninstall-template`
+- `/console/monitor/query`
+- `/console/oauth/authorize`
+- `/console/oauth/oauth-config`
+- `/console/oauth/oauth-services/{}`
+- `/console/oauth/refresh/{}`
+- `/console/oauth/service/{}/user/repositories`
+- `/console/oauth/service/{}/user/repository/branches`
+- `/console/oauth/service/{}/user/repository/code_detection`
+- `/console/oauth/service/{}/user/repository/{}`
+- `/console/oauth/type`
+- `/console/oauth/user`
+- `/console/oauth/user/authorize`
+- `/console/oauth/user/link`
+- `/console/open/monitor/query`
+- `/console/over_score`
+- `/console/php`
+- `/console/plugins`
+- `/console/plugins/installable`
+- `/console/proxy/enterprise-server/api/v1/check_ssh`
+- `/console/proxy/enterprise-server/api/v1/check_ssh_pwd`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/appstores`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/appstores/{}`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/appstores/{}/apps`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/appstores/{}/apps/{}`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/appstores/{}/resync`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/appstores/{}/templates/{}/versions/{}`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/ck-task/{}`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/init-cluster`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/init-task/{}`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/init-tasks`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/init-tasks/{}/status`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/kclusters`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/kclusters/prune-update-rkeconfig`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/kclusters/{}/createlog`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/kclusters/{}/kubeconfig`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/kclusters/{}/rainbond-components`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/kclusters/{}/rainbond-components/{}/events`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/kclusters/{}/rainbondcluster`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/kclusters/{}/regionconfig`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/kclusters/{}/reinstall`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/kclusters/{}/uninstall`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/last-ck-task`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/rke2`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/rke2/install/rainbond/{}`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/rke2/node/status`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/rke2/nodes`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/rke2/{}`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/sync`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/tasks/helm_region_install`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/tasks/{}/events`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/update-cluster`
+- `/console/proxy/enterprise-server/api/v1/enterprises/{}/update-cluster/{}`
+- `/console/proxy/enterprise-server/api/v1/helm/chart`
+- `/console/proxy/enterprise-server/api/v1/init_node_cmd`
+- `/console/rb_component_event`
+- `/console/rb_components_status`
+- `/console/receipt-orders`
+- `/console/receipts`
+- `/console/receipts/confirm`
+- `/console/receipts/{}`
+- `/console/region_config`
+- `/console/regions/monitor`
+- `/console/regions/{}/backend/plugins/rainbond-enterprise-logs/api/ds/query`
+- `/console/regions/{}/backend/plugins/{}/api/v1/components`
+- `/console/regions/{}/backend/plugins/{}{}`
+- `/console/regions/{}/plugins/{}/status`
+- `/console/sms/send-code`
+- `/console/storage_statistics`
+- `/console/update`
+- `/console/update/versions`
+- `/console/update/versions/{}`
+- `/console/update/versions/{}/images`
+- `/console/user/applicants/join`
+- `/console/user_source`
+- `/console/v2/proxy-pass/gateway/{}/loadbalancer`
+- `/console/v2/proxy-pass/gateway/{}/loadbalancer/{}`
+- `/console/v2/proxy-pass/gateway/{}/routes/tcp`
+- `/console/v2/proxy-pass/gateway/{}/routes/tcp/{}`
+- `/console/v2/proxy-pass/registry/check`
+- `/console/v2/proxy-pass/registry/tags`

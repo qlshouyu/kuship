@@ -1,0 +1,338 @@
+@import '~antd/lib/style/themes/default.less';
+@import '../../utils/utils.less';
+.teamAppTitle {
+  div{
+    display: flex;
+    align-items: center;
+    span {
+      margin-right: 5px;
+    }
+    h2 {
+      margin-bottom: 5px;
+      // color: rgba(0,0,0,.65);
+      // font-size: 16px;
+      font-weight: bolder;
+      font-size: @rbd-sub-title-size;
+      color: @rbd-sub-title-color;
+      line-height: @rbd-sub-title-line-height;
+    }
+  }
+}
+//  top module
+.topContainer {
+  width: 100%;
+  background: #fff;
+  border-radius: 5px;
+  padding: 24px;
+  height: 148px;
+  display: flex;
+    > div {
+      width: 20%;
+      height: 100%;
+      padding: 0px 10px;
+      margin-left: 2px;
+      .resourceTitle{
+        width: 100%;
+        text-align: center;
+        font-size: @rbd-sub-title-size;
+        color: @rbd-content-color-secondary;
+        line-height: @rbd-sub-title-line-height;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .resourceValue{
+        font-size: @rbd-display-size;
+        color: @primary-color;
+        line-height: @rbd-display-line-height;
+        // color: #3d54c4;
+        // font-size: 36px;
+        font-weight: 700;
+        width: 100%;
+        height: 90px;
+        line-height: 90px;
+        text-align: center;
+        // 溢出隐藏
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        span{
+          font-size: @rbd-title-size;
+          color: @rbd-content-color-secondary;
+          line-height: @rbd-title-line-height;
+          font-weight: bolder;
+        }
+      }
+    }
+  
+  
+}
+// 团队应用和团队组件
+.teamApp {
+  height: 100%;
+  background-color: #f7fafd;
+  .teamAppTitle {
+    margin-bottom: 0px !important;
+    padding: 10px 10px 10px 20px;
+  }
+  .teamAppContent {
+    height: calc(100% - 44px);
+    background-color: #fff;
+    display: flex;
+    .appEcharts {
+      width: 50%;
+      height: 100%;
+    }
+    .desc {
+      width: 50%;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      margin-left: -10px;
+      margin-top: -20px;
+      .activeApp,
+      .defaultApp {
+        display: flex;
+      }
+      .totalApp {
+        span {
+          position: absolute;
+          bottom: 20px;
+          left: 20px;
+          white-space: nowrap;
+        }
+      }
+      .totalApps {
+        span {
+          position: absolute;
+          bottom: 20px;
+          left: 20px;
+          white-space: nowrap;
+        }
+      }
+    }
+  }
+}
+.teamApp:hover,
+.teamDisk:hover,
+.teamHotAppItem:hover {
+  box-shadow: 0 0 10px 10px #d8e8f8;
+}
+.teamHotAppItem:hover .hotAppItemTitle {
+  color: #4d73b1;
+}
+.hoverPointer {
+  cursor: pointer;
+}
+.appItemDetail:hover {
+  background: #fff;
+}
+// 使用磁盘 内存 用户
+.teamDisk {
+  height: 100%;
+  background-color: #f7fafd;
+  // 标题
+  .teamDiskTitle {
+    margin-bottom: 0px !important;
+    padding: 10px 10px 10px 20px;
+  }
+  .teamDiskContent {
+    height: calc(100% - 44px);
+    width: 100%;
+    background-color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    // 用户数量
+    .userNum {
+      p {
+        color: #457eaf;
+        font-size: 36px;
+        font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+        margin-bottom: 0px !important;
+        margin-right: 5px;
+      }
+      span {
+        color: #aeaeae;
+        font-size: 24px;
+        padding-top: 15px;
+      }
+    }
+    > div {
+      display: flex;
+      // position: relative;
+      // 内存
+      .save {
+        // padding-right: 60px;
+      }
+      .save,
+      .disk {
+        text-align: center;
+        > p {
+          // font-size: 18px;
+          text-align: center;
+        }
+        > div {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          > p {
+            color: #457eaf;
+            font-size: 36px;
+            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial,
+              sans-serif;
+            margin-bottom: 0px !important;
+            margin-right: 5px;
+          }
+          span {
+            color: #aeaeae;
+            font-size: 24px;
+            padding-top: 15px;
+          }
+        }
+      }
+      // 竖线
+      .useLine {
+        // position: absolute;
+        // left: calc(50% + 2px);
+        // top: 50%;
+        // transform: translateY(-50%);
+        width: 2px;
+        height: 24px;
+        border-radius: 5px;
+        background-color: #aeb7c3;
+        margin: 22px;
+      }
+    }
+  }
+}
+// 热门应用列表标题
+.teamHotAppTitle {
+  margin-top: 24px;
+  padding: 0px 6px;
+  display: flex;
+  justify-content: space-between;
+  .teamHotAppTitleLeft {
+    // padding: 5px 0px;
+    display: flex;
+    align-items: center;
+    span {
+      margin-right: 5px;
+      padding-top: 2px;
+    }
+    h2 {
+      margin-bottom: 5px;
+      // font-size: 16px;
+      // color: rgba(0,0,0,.65);
+      font-weight: bolder;
+      font-size: @rbd-sub-title-size;
+      color: @rbd-sub-title-color;
+      line-height: @rbd-sub-title-line-height;
+    }
+  }
+  
+}
+
+.ellipsis {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+// 团队热门应用列表
+.appListBox{
+  background:#fff;
+  padding: 24px 0px;
+  border-radius: 5px;
+  .teamHotAppTitleSearch {
+    margin: 0 24px 0;
+  }
+  .teamHotAppList {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    padding: 12px 24px;
+    > div {
+      width: 22%;
+      height: 100px;
+      margin-top: 30px;
+      .teamHotAppItem {
+        background: rgba(42, 130, 228, 4%);
+        width: 100%;
+        height: 100px;
+        border-radius: 5px;
+        display: flex;
+        .appStatus {
+          width: 10%;
+          height: 100px;
+          color: #fff;
+          border-top-left-radius: 5px;
+          border-bottom-left-radius: 5px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          > div{
+            width: 20px;
+            text-align: center;
+          }
+        }
+        .appItemDetail{
+            width: 90%;
+            color: #aeaeae;
+            padding: 0px 12px;
+            .appTitle {
+              margin-top: 10px;
+              font-weight: bolder;
+              width: 100%;
+              white-space: nowrap; 
+              overflow: hidden;
+              text-overflow: ellipsis;
+              font-size: @rbd-sub-title-size;
+              color: @rbd-sub-title-color;
+              line-height: @rbd-sub-title-line-height;
+            }
+            .value{
+                display: flex;
+                // font-size: 12px;
+                margin-top: 10px;
+                font-size: @rbd-auxiliary-size;
+                line-height: @rbd-auxiliary-line-height;
+                color: @rbd-auxiliary-color-secondary;
+                > div{
+                  width: 100%;
+                }
+            }
+            .updateTime {
+                // font-size: 12px;
+                margin-top: 10px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: @rbd-auxiliary-size;
+                line-height: @rbd-auxiliary-line-height;
+                color: @rbd-auxiliary-color-secondary;
+            }
+        }
+      }
+    }
+  }
+}
+
+.no_teamHotAppList{
+  display: flex;
+  flex-wrap: wrap;
+  min-height: 300px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #fff;
+  border-radius: 5px;
+}
+// 分页
+.pagination {
+  margin: 24px 0px;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}

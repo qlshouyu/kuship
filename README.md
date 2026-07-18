@@ -67,5 +67,5 @@ sudo RKE2_URL=... RKE2_TOKEN=... ./agent-install.sh          # agent 节点
 # 在/etc/hosts设置 rbd-api-api映射到本地地址，方便kuship-console调用docker启动的rbd-api
 ! sudo sh -c 'grep -q "rbd-api-api" /etc/hosts || echo "127.0.0.1 rbd-api-api" >> /etc/hosts'
 ```
-
+interop / Interop@123 
 ## 其他

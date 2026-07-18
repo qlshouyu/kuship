@@ -24,6 +24,7 @@ public class SecurityConfig {
     public static final String[] PUBLIC_PATHS = {
             "/console/users/login",
             "/console/config/info",
+            "/console/perms",
             "/console/healthz",
             "/actuator/health",
             "/actuator/info"

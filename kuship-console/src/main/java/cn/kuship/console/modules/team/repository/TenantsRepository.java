@@ -12,6 +12,9 @@ public interface TenantsRepository extends JpaRepository<Tenants, Integer> {
 
     Optional<Tenants> findByTenantName(String tenantName);
 
+    /** 按 tenant_id 查团队（对齐 get_team_by_team_id）。 */
+    Optional<Tenants> findByTenantId(String tenantId);
+
     /** 同企业内按团队别名查重（建团队用）。 */
     Optional<Tenants> findByTenantAliasAndEnterpriseId(String tenantAlias, String enterpriseId);
 

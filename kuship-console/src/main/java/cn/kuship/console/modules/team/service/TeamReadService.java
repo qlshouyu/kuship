@@ -1,7 +1,9 @@
 package cn.kuship.console.modules.team.service;
 
+import cn.kuship.console.common.exception.ServiceHandleException;
 import cn.kuship.console.modules.account.entity.UserInfo;
 import cn.kuship.console.modules.account.repository.UserInfoRepository;
+import cn.kuship.console.modules.rbac.service.TeamMemberRoleService;
 import cn.kuship.console.modules.region.entity.RegionConfig;
 import cn.kuship.console.modules.region.repository.RegionConfigRepository;
 import cn.kuship.console.modules.team.entity.PermRelTenant;
@@ -31,16 +33,20 @@ public class TeamReadService {
     private final RegionConfigRepository regionConfigRepository;
     private final UserInfoRepository userInfoRepository;
 
+    private final TeamMemberRoleService teamMemberRoleService;
+
     public TeamReadService(TenantsRepository tenantsRepository,
                            TenantRegionInfoRepository tenantRegionRepository,
                            PermRelTenantRepository permRelTenantRepository,
                            RegionConfigRepository regionConfigRepository,
-                           UserInfoRepository userInfoRepository) {
+                           UserInfoRepository userInfoRepository,
+                           TeamMemberRoleService teamMemberRoleService) {
         this.tenantsRepository = tenantsRepository;
         this.tenantRegionRepository = tenantRegionRepository;
         this.permRelTenantRepository = permRelTenantRepository;
         this.regionConfigRepository = regionConfigRepository;
         this.userInfoRepository = userInfoRepository;
+        this.teamMemberRoleService = teamMemberRoleService;
     }
 
     /** 企业下团队列表（bean = {total_count,page,page_size,list}）。 */
@@ -57,6 +63,10 @@ public class TeamReadService {
 
     /** 用户加入的团队（成员关系 tenant_perms ∪ 自己创建的团队）。 */
     public List<Map<String, Object>> listUserTeams(String enterpriseId, Integer userId) {
+        // 对齐 rainbond：user_id 不存在 → 404 user not found / 用户不存在
+        if (userInfoRepository.findById(userId).isEmpty()) {
+            throw ServiceHandleException.notFound("user not found", "用户不存在");
+        }
         List<Integer> tenantPks = permRelTenantRepository.findByUserId(userId).stream()
                 .map(PermRelTenant::getTenantId).collect(Collectors.toList());
         List<Tenants> teams = tenantPks.isEmpty() ? new ArrayList<>() : tenantsRepository.findByIdIn(tenantPks);
@@ -111,8 +121,8 @@ public class TeamReadService {
         m.put("owner", t.getCreater());
         m.put("owner_name", ownerName(t.getCreater()));
         m.put("logo", t.getLogo());
-        // 角色：owner 短路给 owner 标记；完整角色名（如"管理员"）属 RBAC，留 P1-b
-        List<String> roles = new ArrayList<>();
+        // 角色（对齐 get_user_roles）：先用户在团队的角色名，creater 再追加 "owner"
+        List<String> roles = new ArrayList<>(teamMemberRoleService.userTeamRoleNames(t.getTenantId(), userId));
         if (userId.equals(t.getCreater())) {
             roles.add("owner");
         }
