@@ -95,6 +95,15 @@ public class TeamMemberRoleService {
         return out;
     }
 
+    /** 用户在团队的角色名列表（对齐 get_user_roles["roles"]，不含 owner 追加）。 */
+    public List<String> userTeamRoleNames(String tenantId, Integer userId) {
+        List<String> names = new ArrayList<>();
+        for (Map<String, Object> it : userTeamRoleItems(tenantId, userId, teamRoleIdName(tenantId))) {
+            names.add(String.valueOf(it.get("role_name")));
+        }
+        return names;
+    }
+
     /**
      * 成员分页列表（对齐 TeamUserView.get）：每项 {user_id,user_name,nick_name,email,role_info}；
      * role_info 取「请求者」在该团队的角色（忠实 rainbond 现状，逐行相同）。返回 {list, total}。

@@ -34,6 +34,7 @@ kuship/
 │
 ├── reference/                   # Rainbond 参考代码（git submodule，只读）
 │   ├── rainbond-console/        # Rainbond 控制台后端（参考实现）
+│   ├── rainbond/                # Rainbond rainbond核心包括region api
 │   ├── rainbond-ui/             # Rainbond 控制台前端
 │   └── rainbond-chart/          # Rainbond Helm Chart（含 CRD 与模板）
 │

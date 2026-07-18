@@ -1,0 +1,149 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1784365205657,
+  "projectRoot": "/Users/egojit/workspace/my_project/kuship",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "scripts"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "docker": {
+      "path": "docker",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1784365205635,
+      "keyFiles": [
+        "README.md",
+        "docker-compose.yaml",
+        "mysql-init.sql"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 45,
+      "lastAccessed": 1784365205636,
+      "keyFiles": [
+        "kuship-api-接口文档-preview.png",
+        "kuship-api-接口文档.html",
+        "kuship-console-架构设计.md",
+        "p1a-7070-reference.md",
+        "p1b-7070-reference.md"
+      ]
+    },
+    "kuship-console": {
+      "path": "kuship-console",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1784365205638,
+      "keyFiles": [
+        "README.md",
+        "pom.xml"
+      ]
+    },
+    "kuship-ui": {
+      "path": "kuship-ui",
+      "purpose": null,
+      "fileCount": 19,
+      "lastAccessed": 1784365205639,
+      "keyFiles": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "Dockerfile",
+        "LICENSE",
+        "README.md"
+      ]
+    },
+    "openspec": {
+      "path": "openspec",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1784365205640,
+      "keyFiles": []
+    },
+    "reference": {
+      "path": "reference",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1784365205641,
+      "keyFiles": []
+    },
+    "rke2": {
+      "path": "rke2",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1784365205642,
+      "keyFiles": [
+        "README.md",
+        "agent-install.sh",
+        "bootstrap-rainbond.sh",
+        "config-agent.yaml",
+        "config-server.yaml"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1784365205643,
+      "keyFiles": [
+        "native-build.sh",
+        "native-test.sh"
+      ]
+    },
+    "standalone": {
+      "path": "standalone",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1784365205643,
+      "keyFiles": [
+        "Dockerfile",
+        "business-images-package.sh",
+        "config.yaml",
+        "entrypoint.sh",
+        "images-package.sh"
+      ]
+    },
+    "tools": {
+      "path": "tools",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1784365205644,
+      "keyFiles": []
+    },
+    "kuship-console/src": {
+      "path": "kuship-console/src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1784365205645,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}
