@@ -1,8 +1,8 @@
 package cn.kuship.console.modules.team.controller;
 
-import cn.kuship.console.common.exception.ServiceHandleException;
 import cn.kuship.console.common.response.ApiResult;
 import cn.kuship.console.common.response.GeneralMessage;
+import cn.kuship.console.common.util.RegionScope;
 import cn.kuship.console.modules.authorization.annotation.PermScope;
 import cn.kuship.console.modules.authorization.annotation.RequiresPerms;
 import cn.kuship.console.modules.enterprise.service.EnterpriseContextResolver;
@@ -57,9 +57,7 @@ public class TeamController {
     @RequiresPerms(kind = PermScope.TEAM, codes = {200001})
     public ApiResult teamOverview(@PathVariable("team_name") String teamName,
                                   @RequestParam(value = "region_name", required = false) String regionName) {
-        if (regionName == null || regionName.isBlank()) {
-            throw ServiceHandleException.badRequest("region_name is required", "请求参数不全");
-        }
+        RegionScope.require(regionName);
         Tenants team = teamContextResolver.requireTeam(teamName);
         Map<String, Object> bean = teamReadService.teamOverview(team, regionName);
         return GeneralMessage.bean(200, "success", "查询成功", bean);
