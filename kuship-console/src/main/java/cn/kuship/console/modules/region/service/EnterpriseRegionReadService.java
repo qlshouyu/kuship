@@ -130,7 +130,9 @@ public class EnterpriseRegionReadService {
             Map<String, Object> servicesStatus = new LinkedHashMap<>();
             servicesStatus.put("running", bean.get("run_pod_number"));
             dict.put("services_status", servicesStatus);
-            dict.put("pods", bean.get("pods"));
+            // pods 空态对齐 7070：缺省为 {} 而非 null
+            Object pods = bean.get("pods");
+            dict.put("pods", pods == null ? new LinkedHashMap<>() : pods);
             dict.put("run_pod_number", bean.get("run_pod_number"));
             dict.put("node_ready", bean.get("node_ready"));
             // 节点架构
