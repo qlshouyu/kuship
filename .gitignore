@@ -12,3 +12,6 @@ kuship-console/**/application-local.yaml
 # Claude Code local state
 .claude/
 .claire/
+
+# oh-my-claudecode 会话状态（不入库）
+.omc/
