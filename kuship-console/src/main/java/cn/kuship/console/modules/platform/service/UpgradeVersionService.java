@@ -32,6 +32,47 @@ public class UpgradeVersionService {
 
     /** 版本号降序列表；失败返回 []（对齐 fetch_json_data 返回 None → JsonResponse([])）。 */
     public List<String> listVersions() {
+        List<Map<String, Object>> data = fetchData();
+        if (data == null) {
+            return List.of();
+        }
+        return data.stream()
+                .map(m -> m.get("version"))
+                .filter(v -> v != null)
+                .map(Object::toString)
+                .sorted(Comparator.reverseOrder())
+                .collect(Collectors.toList());
+    }
+
+    /** 版本详情（对齐 UpgradeVersionRView：无清单或未命中/detail 假值 → {}）。 */
+    public Object versionDetail(String version) {
+        return fieldOfVersion(version, "detail");
+    }
+
+    /** 版本镜像清单（对齐 UpgradeVersionImagesView：同上取 images）。 */
+    public Object versionImages(String version) {
+        return fieldOfVersion(version, "images");
+    }
+
+    /** next((item[field] for item if item.version==version), None) or {} 的 Python 语义。 */
+    private Object fieldOfVersion(String version, String field) {
+        List<Map<String, Object>> data = fetchData();
+        if (data == null) {
+            return Map.of();
+        }
+        Object value = data.stream()
+                .filter(m -> version.equals(m.get("version")))
+                .map(m -> m.get(field))
+                .findFirst()
+                .orElse(null);
+        boolean falsy = value == null || "".equals(value)
+                || (value instanceof Map<?, ?> mv && mv.isEmpty())
+                || (value instanceof List<?> lv && lv.isEmpty());
+        return falsy ? Map.of() : value;
+    }
+
+    /** 对齐 fetch_json_data：拉取 VERSION_INFO_URL；任何异常/非 200 → null。 */
+    private List<Map<String, Object>> fetchData() {
         try {
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(5))
@@ -42,19 +83,13 @@ public class UpgradeVersionService {
                     .build();
             HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() != 200) {
-                return List.of();
+                return null;
             }
-            List<Map<String, Object>> data = MAPPER.readValue(resp.body(), new TypeReference<>() {
+            return MAPPER.readValue(resp.body(), new TypeReference<>() {
             });
-            return data.stream()
-                    .map(m -> m.get("version"))
-                    .filter(v -> v != null)
-                    .map(Object::toString)
-                    .sorted(Comparator.reverseOrder())
-                    .collect(Collectors.toList());
         } catch (Exception e) {
             log.warn("fetch upgrade versions failed: {}", e.getMessage());
-            return List.of();
+            return null;
         }
     }
 }

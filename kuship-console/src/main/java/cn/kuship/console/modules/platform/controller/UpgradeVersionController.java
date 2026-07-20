@@ -3,6 +3,7 @@ package cn.kuship.console.modules.platform.controller;
 import cn.kuship.console.common.response.SkipResponseWrapper;
 import cn.kuship.console.modules.platform.service.UpgradeVersionService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -25,5 +26,19 @@ public class UpgradeVersionController {
     @SkipResponseWrapper
     public List<String> versions() {
         return service.listVersions();
+    }
+
+    /** GET /console/update/versions/{version} —— 裸对象：版本 detail，未命中/无清单 {}。 */
+    @GetMapping("/console/update/versions/{version}")
+    @SkipResponseWrapper
+    public Object versionDetail(@PathVariable("version") String version) {
+        return service.versionDetail(version);
+    }
+
+    /** GET /console/update/versions/{version}/images —— 裸对象：版本镜像清单，未命中/无清单 {}。 */
+    @GetMapping("/console/update/versions/{version}/images")
+    @SkipResponseWrapper
+    public Object versionImages(@PathVariable("version") String version) {
+        return service.versionImages(version);
     }
 }
