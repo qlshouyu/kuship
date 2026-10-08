@@ -23,7 +23,14 @@
 | GET regions/{r}/platform-plugins | ✅ 一致（**重写**：空 stub→1:1 移植市场拉取+合并逻辑，10 项全对齐） | [region-plugins.md](region-plugins.md) | 2026-07-18 |
 
 | GET teams/{t}/overview（计数） | ✅ 一致（修存量：team_app_num/team_service_num 硬编码 0→真实计数） | [GET-team-overview-counts.md](GET-team-overview-counts.md) | 2026-07-18 |
+| GET update/versions/{v} | ✅ 一致（本轮新实现） | [GET-update-versions-detail.md](GET-update-versions-detail.md) | 2026-07-18 |
+| GET update/versions/{v}/images | ✅ 一致（本轮新实现） | [GET-update-versions-detail.md](GET-update-versions-detail.md) | 2026-07-18 |
+| GET regions/{r}/nodes/{n} | ✅ 稳定字段一致（req 磁盘为活体；本轮新实现） | [region-node-detail-labels-taints.md](region-node-detail-labels-taints.md) | 2026-07-18 |
+| GET regions/{r}/nodes/{n}/labels | ✅ 一致（本轮新实现） | [region-node-detail-labels-taints.md](region-node-detail-labels-taints.md) | 2026-07-18 |
+| GET regions/{r}/nodes/{n}/taints | ✅ 一致（bean=list 怪癖复刻；本轮新实现） | [region-node-detail-labels-taints.md](region-node-detail-labels-taints.md) | 2026-07-18 |
+| PUT regions/{r}/nodes/{n}/labels、/taints | ✅ 错误契约逐字节一致（成功路径不实测） | [region-node-detail-labels-taints.md](region-node-detail-labels-taints.md) | 2026-07-18 |
 
 **横切修复**（2026-07-18 回归发现）：
 1. raw ISO 时间戳微秒截尾零差异（`.185550`→Jackson 输出 `.18555`）——新增 `PyIsoDateTime.iso()` 统一格式化，替换 enterprise/users、regions(list/detail)、组件 envs 4 处输出。
 2. 未认证 401 信封（全局）：裸三字段+固定文案，见 [GET-update-versions.md](GET-update-versions.md)。
+3. region API 错误契约（全局）：`RegionCallException` + handler 渲染 rainbond CallApiError 同款裸信封（404→数据中心资源不存在；其余→400 结构化 msg+「数据中心操作故障」），见 [region-node-detail-labels-taints.md](region-node-detail-labels-taints.md)。

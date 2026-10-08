@@ -148,6 +148,95 @@ public class RegionClusterService {
         return out;
     }
 
+    /** 单节点详情（对齐 enterprise_services.get_node_detail：region /v2/cluster/nodes/{n}/detail 的 bean 重排+换算）。 */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getNodeDetail(String regionName, String nodeName) {
+        String body = regionClient.exchange(regionName, "GET",
+                "/v2/cluster/nodes/" + nodeName + "/detail", null, TimeoutTier.NORMAL, null);
+        Map<String, Object> node;
+        try {
+            Object bean = MAPPER.readValue(body, Map.class).get("bean");
+            node = bean instanceof Map ? (Map<String, Object>) bean : Map.of();
+        } catch (Exception e) {
+            node = Map.of();
+        }
+        Map<String, Object> resource = asMap(node.get("resource"));
+        Object externalIp = node.get("external_ip");
+        boolean hasExternal = externalIp != null && !"".equals(externalIp);
+
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("name", node.get("name"));
+        res.put("ip", hasExternal ? externalIp : node.get("internal_ip"));
+        res.put("container_runtime", node.get("container_run_time"));
+        res.put("architecture", node.get("architecture"));
+        res.put("roles", node.get("roles"));
+        res.put("os_version", node.get("os_version"));
+        boolean unschedulable = Boolean.TRUE.equals(node.get("unschedulable"));
+        res.put("unschedulable", unschedulable);
+        res.put("create_time", node.get("create_time"));
+        res.put("kernel", node.get("kernel_version"));
+        res.put("os_type", node.get("operating_system"));
+        res.put("req_cpu", resource.get("req_cpu"));
+        res.put("cap_cpu", resource.get("cap_cpu"));
+        res.put("req_memory", toDouble(resource.get("req_memory")) / 1000);
+        res.put("cap_memory", toDouble(resource.get("cap_memory")) / 1000);
+        res.put("req_root_partition", toDouble(resource.get("req_disk")) / 1024 / 1024 / 1024);
+        res.put("cap_root_partition", toDouble(resource.get("cap_disk")) / 1024 / 1024 / 1024);
+        res.put("cap_docker_partition", toDouble(resource.get("cap_container_disk")) / 1024 / 1024 / 1024);
+        res.put("req_docker_partition", toDouble(resource.get("req_container_disk")) / 1024 / 1024 / 1024);
+        String status = "NotReady";
+        if (node.get("conditions") instanceof List<?> cl) {
+            for (Object c : cl) {
+                if (c instanceof Map<?, ?> cm && "Ready".equals(cm.get("type")) && "True".equals(cm.get("status"))) {
+                    status = "Ready";
+                }
+            }
+        }
+        if (unschedulable) {
+            status = status + ",SchedulingDisabled";
+        }
+        res.put("status", status);
+        return res;
+    }
+
+    /** 节点标签读（对齐 NodeLabelsOperate.get：bean=region body.bean）。 */
+    public Object getNodeLabels(String regionName, String nodeName) {
+        return regionField("GET", regionName, "/v2/cluster/nodes/" + nodeName + "/labels", null, "bean");
+    }
+
+    /** 节点标签写（对齐 NodeLabelsOperate.put：region body=labels 本体，bean=body.bean）。 */
+    public Object updateNodeLabels(String regionName, String nodeName, Object labels) {
+        return regionField("PUT", regionName, "/v2/cluster/nodes/" + nodeName + "/labels", labels, "bean");
+    }
+
+    /** 节点污点读（对齐 NodeTaintOperate.get：**bean**=region body.list，rainbond 原样怪癖）。 */
+    public Object getNodeTaints(String regionName, String nodeName) {
+        return regionField("GET", regionName, "/v2/cluster/nodes/" + nodeName + "/taints", null, "list");
+    }
+
+    /** 节点污点写（对齐 NodeTaintOperate.put：region body=taints 本体，list=body.list）。 */
+    public Object updateNodeTaints(String regionName, String nodeName, Object taints) {
+        return regionField("PUT", regionName, "/v2/cluster/nodes/" + nodeName + "/taints", taints, "list");
+    }
+
+    private Object regionField(String method, String regionName, String path, Object body, String field) {
+        String resp = regionClient.exchange(regionName, method, path,
+                body == null ? null : toJson(body), TimeoutTier.NORMAL, null);
+        try {
+            return MAPPER.readValue(resp, Map.class).get(field);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String toJson(Object o) {
+        try {
+            return MAPPER.writeValueAsString(o);
+        } catch (Exception e) {
+            return "null";
+        }
+    }
+
     /** 节点操作（对齐 NodeAction）。action 非法 → 抛 400「暂不支持当前操作」；否则 POST region 并回传 bean。 */
     public Object operateNodeAction(String regionName, String nodeName, String action) {
         if (action == null || !SUPPORT_ACTIONS.contains(action)) {

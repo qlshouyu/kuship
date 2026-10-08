@@ -37,6 +37,8 @@ import java.security.cert.X509Certificate;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 /**
  * 单 region-api 的传输骨架（仅传输/认证/连接池/重试与超时，<b>不含任何 /v2/tenants 域方法</b>）。
  *
@@ -52,6 +54,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RegionClient {
 
     private static final Logger log = LoggerFactory.getLogger(RegionClient.class);
+    /** 仅用于解析 region 错误响应体（RegionCallException.body）。 */
+    private static final ObjectMapper ERROR_BODY_MAPPER = new ObjectMapper();
 
     private final RegionConfigRepository regionRepository;
     private final RegionProperties properties;
@@ -109,7 +113,16 @@ public class RegionClient {
                 String respBody = response.getEntity() == null ? ""
                         : EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
                 if (status >= 400) {
-                    throw new ServiceHandleException(status, "region error: " + status, "集群请求失败");
+                    // 对齐 rainbond CallApiError：携带 url/method/httpcode/body，由全局 handler 渲染。
+                    // url 用 region_info 配置值（非 urlOverride 实际值），与 7070 报错体逐字节一致。
+                    Object parsedBody;
+                    try {
+                        parsedBody = ERROR_BODY_MAPPER.readValue(respBody, Object.class);
+                    } catch (Exception pe) {
+                        parsedBody = respBody;
+                    }
+                    throw new cn.kuship.console.common.exception.RegionCallException(
+                            endpoint.url() + path, method, status, parsedBody);
                 }
                 return respBody;
             });

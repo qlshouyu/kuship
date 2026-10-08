@@ -27,6 +27,37 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /**
+     * region API 调用失败（对齐 rainbond base.py CallApiError 分支，裸信封无 data 键）：
+     * region 404 → HTTP 404 固定文案；其余 → HTTP 400，msg 为结构化 dict
+     * {apitype,url,method,httpcode,body}，msg_show=「数据中心操作故障 <core>」。
+     */
+    @ExceptionHandler(RegionCallException.class)
+    @cn.kuship.console.common.response.SkipResponseWrapper
+    public ResponseEntity<Object> handleRegionCall(RegionCallException ex) {
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        if (ex.getHttpcode() == 404) {
+            out.put("code", 404);
+            out.put("msg", "region no found this resource");
+            out.put("msg_show", "数据中心资源不存在");
+            return ResponseEntity.status(404).body(out);
+        }
+        java.util.Map<String, Object> message = new java.util.LinkedHashMap<>();
+        message.put("apitype", "Not specified");
+        message.put("url", ex.getUrl());
+        message.put("method", ex.getMethod());
+        message.put("httpcode", ex.getHttpcode());
+        message.put("body", ex.getBody());
+        String coreError = String.valueOf(message);
+        if (ex.getBody() instanceof java.util.Map<?, ?> bm && bm.get("msg") != null) {
+            coreError = String.valueOf(bm.get("msg"));
+        }
+        out.put("code", 400);
+        out.put("msg", message);
+        out.put("msg_show", "数据中心操作故障 " + coreError);
+        return ResponseEntity.status(400).body(out);
+    }
+
     @ExceptionHandler(ServiceHandleException.class)
     public ResponseEntity<ApiResult> handleService(ServiceHandleException ex) {
         // 信封 code 取业务 errorCode（默认回落 status），HTTP 取 status；bare 则裸信封（无 data）
